@@ -1,1 +1,15 @@
 .DS_Store
+*.swp
+*.swo
+__pycache__/
+*.pyc
+.venv/
+metrics_panel.db
+metrics_panel.db-shm
+metrics_panel.db-wal
+test_panel.db
+test_panel.db-shm
+test_panel.db-wal
+tokens.json
+*.log
+result.xlsx

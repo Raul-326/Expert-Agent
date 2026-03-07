@@ -33,14 +33,14 @@ except Exception:
 
 # ================= 配置区 =================
 # 飞书 API 配置
-FEISHU_APP_ID = os.environ.get("FEISHU_APP_ID", "cli_a9156f4577b99cbb")
-FEISHU_APP_SECRET = os.environ.get("FEISHU_APP_SECRET", "t7z3OruUzeOayL9aLgSt7yNfI0mziHU1")
+FEISHU_APP_ID = os.environ.get("FEISHU_APP_ID", "")
+FEISHU_APP_SECRET = os.environ.get("FEISHU_APP_SECRET", "")
 FEISHU_USER_ACCESS_TOKEN = os.environ.get("FEISHU_USER_ACCESS_TOKEN", "")
 FEISHU_OPEN_HOST = os.environ.get("FEISHU_OPEN_HOST", "https://fsopen.bytedance.net").rstrip("/")
 FEISHU_USER_TOKEN_FILE = os.environ.get("FEISHU_USER_TOKEN_FILE", "")
 
 # ModelArk API 配置
-ARK_API_KEY = os.environ.get("ARK_API_KEY", "8b65e642-beaa-4f37-9626-0b1e84cfdfc3")
+ARK_API_KEY = os.environ.get("ARK_API_KEY", "")
 ARK_BASE_URL = "https://ark-ap-southeast.byteintl.net/api/v3"
 DEFAULT_MODEL = "ep-20260227030217-66fc4"
 
