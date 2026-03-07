@@ -12,11 +12,13 @@ import httpx
 import sys
 import argparse
 import re
+import time
 import unicodedata
 import uuid
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional, Tuple, Dict, Any
+from typing import Optional, Tuple, Dict, Any, List
 from urllib.parse import urlparse, parse_qs
 
 try:
@@ -34,6 +36,8 @@ except Exception:
 FEISHU_APP_ID = os.environ.get("FEISHU_APP_ID", "cli_a9156f4577b99cbb")
 FEISHU_APP_SECRET = os.environ.get("FEISHU_APP_SECRET", "t7z3OruUzeOayL9aLgSt7yNfI0mziHU1")
 FEISHU_USER_ACCESS_TOKEN = os.environ.get("FEISHU_USER_ACCESS_TOKEN", "")
+FEISHU_OPEN_HOST = os.environ.get("FEISHU_OPEN_HOST", "https://fsopen.bytedance.net").rstrip("/")
+FEISHU_USER_TOKEN_FILE = os.environ.get("FEISHU_USER_TOKEN_FILE", "")
 
 # ModelArk API 配置
 ARK_API_KEY = os.environ.get("ARK_API_KEY", "8b65e642-beaa-4f37-9626-0b1e84cfdfc3")
@@ -43,6 +47,351 @@ DEFAULT_MODEL = "ep-20260227030217-66fc4"
 # 定义什么词汇代表"通过/正确" (支持忽略大小写)
 PASS_LABELS = ['通过', 'pass', 'yes', '是', 'aligned', 'agree', '同意', 'true', '1', 'correct']
 FAIL_LABELS = ['不通过', 'fail', 'no', '否', 'disagree', '不同意', 'false', 'incorrect']
+
+DEFAULT_REFERENCE_KEYWORDS = [
+    "gt", "gold", "reference", "final", "review", "reviewer", "qc", "cc", "qa",
+    "checker", "audit", "标准", "参考", "复核", "质检", "抽检",
+]
+DEFAULT_SOURCE_KEYWORDS = [
+    "sp", "annotator", "labeler", "rater", "m1", "初标", "标注", "一审",
+]
+DEFAULT_OBJECTIVE_KEYWORDS = [
+    "badcase", "type", "label", "category", "tag", "verdict", "result", "结果", "类型", "标签",
+]
+DEFAULT_SUBJECTIVE_KEYWORDS = [
+    "description", "comment", "reason", "note", "explain", "说明", "描述", "原因", "备注",
+]
+
+
+def judge_pass_label(value: Any) -> Optional[bool]:
+    """将结果值归一为 通过/不通过；无法判断返回 None。"""
+    txt = str(value or "").strip().lower()
+    if not txt:
+        return None
+
+    fail_exact = {"不通过", "fail", "no", "否", "disagree", "不同意", "false", "incorrect"}
+    pass_exact = {"通过", "pass", "yes", "是", "aligned", "agree", "同意", "true", "1", "correct"}
+    if txt in fail_exact:
+        return False
+    if txt in pass_exact:
+        return True
+
+    # 模糊匹配时，失败优先，避免“不通过”被“通过”误判
+    # 避免在长句评论中被 "failure/yes/no" 等误触发，contains 仅保留高置信词
+    fail_contains = ["不通过", " fail ", "disagree", "不同意", "false", "incorrect"]
+    pass_contains = ["通过", " pass ", "agree", "同意", "true"]
+    if any(k in txt for k in fail_contains):
+        return False
+    if any(k in txt for k in pass_contains):
+        return True
+    return None
+
+
+def _call_modelark_json(prompt: str) -> Dict[str, Any]:
+    text = call_modelark_text(prompt)
+    return _extract_first_json_dict(text)
+
+
+def _normalize_keyword_values(values: Any, defaults: List[str]) -> List[str]:
+    if values is None:
+        return list(defaults)
+    if isinstance(values, str):
+        parts = re.split(r"[,\n，;；|]+", values)
+    elif isinstance(values, (list, tuple, set)):
+        parts = [str(x) for x in values]
+    else:
+        parts = [str(values)]
+    out: List[str] = []
+    for p in parts:
+        item = str(p or "").strip()
+        if not item:
+            continue
+        out.append(item)
+    if not out:
+        return list(defaults)
+    seen = set()
+    uniq = []
+    for x in out:
+        k = x.lower()
+        if k in seen:
+            continue
+        seen.add(k)
+        uniq.append(x)
+    return uniq
+
+
+def _column_metadata_from_df(df: pd.DataFrame) -> List[Dict[str, Any]]:
+    meta = df.attrs.get("column_metadata")
+    if isinstance(meta, list) and meta:
+        return meta
+    out: List[Dict[str, Any]] = []
+    for idx, col in enumerate(df.columns):
+        name = str(col)
+        out.append(
+            {
+                "index": idx,
+                "group_name": "",
+                "leaf_name": name,
+                "full_name": name,
+                "column_name": name,
+            }
+        )
+    return out
+
+
+def _build_column_profiles(df: pd.DataFrame, column_metadata: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    profiles: List[Dict[str, Any]] = []
+    for m in column_metadata:
+        col_name = str(m.get("column_name") or "")
+        if not col_name or col_name not in df.columns:
+            continue
+        s = df[col_name].dropna().astype(str).str.strip()
+        s = s[s != ""]
+        samples = [x[:120] for x in s.drop_duplicates().head(8).tolist()]
+        profiles.append(
+            {
+                "column_name": col_name,
+                "group_name": str(m.get("group_name") or ""),
+                "leaf_name": str(m.get("leaf_name") or ""),
+                "full_name": str(m.get("full_name") or col_name),
+                "sample_values": samples,
+            }
+        )
+    return profiles
+
+
+def infer_reference_pairs_with_ark(
+    df: pd.DataFrame,
+    reference_keywords: Optional[List[str]] = None,
+    objective_keywords: Optional[List[str]] = None,
+    subjective_keywords: Optional[List[str]] = None,
+) -> Dict[str, Any]:
+    """
+    Ark 主导的通用参考列识别（不依赖固定 GT 命名）。
+    返回：
+    {
+      "candidates": [{"confidence":0.0, "pairs":[...], "source_group":"", "reference_group":""}],
+      "selected": {...} | None
+    }
+    """
+    ref_kw = _normalize_keyword_values(reference_keywords, DEFAULT_REFERENCE_KEYWORDS)
+    src_kw = list(DEFAULT_SOURCE_KEYWORDS)
+    obj_kw = _normalize_keyword_values(objective_keywords, DEFAULT_OBJECTIVE_KEYWORDS)
+    sub_kw = _normalize_keyword_values(subjective_keywords, DEFAULT_SUBJECTIVE_KEYWORDS)
+
+    column_metadata = _column_metadata_from_df(df)
+    profiles = _build_column_profiles(df, column_metadata)
+    if not profiles:
+        return {"candidates": [], "selected": None}
+
+    col_names = [str(c) for c in df.columns.tolist()]
+    prompt = f"""
+你是“作业表参考列组识别”专家。请从给定列元数据里识别：
+1) 初标(source)列组
+2) 参考(reference)列组（可能是 GT/QC/CC/QA/复核/质检 等，不局限于 GT）
+3) source/reference 对齐列对，并标注每对类型 objective 或 subjective
+
+规则：
+- 你必须输出多个候选组（如果只有一个也放到 candidates）。
+- `type=objective` 的列才用于通过率判定。
+- `type=subjective` 的列不参与 pass/fail，只做上下文。
+- 列名必须使用给定 column_name 的原文。
+- 若无法确认，置信度可降低，但仍尽量给候选。
+
+关键词提示：
+- reference: {json.dumps(ref_kw, ensure_ascii=False)}
+- source: {json.dumps(src_kw, ensure_ascii=False)}
+- objective: {json.dumps(obj_kw, ensure_ascii=False)}
+- subjective: {json.dumps(sub_kw, ensure_ascii=False)}
+
+列元数据:
+{json.dumps(profiles, ensure_ascii=False)}
+
+仅输出 JSON：
+{{
+  "candidates": [
+    {{
+      "source_group": "",
+      "reference_group": "",
+      "confidence": 0.0,
+      "pairs": [
+        {{"source_col": "", "reference_col": "", "type": "objective", "reason": ""}}
+      ]
+    }}
+  ],
+  "recommended_index": 0
+}}
+"""
+
+    try:
+        payload = _call_modelark_json(prompt)
+    except Exception as e:
+        print(f"[Ark参考列识别失败] {e}")
+        return {"candidates": [], "selected": None}
+
+    valid_cols = set(col_names)
+    candidates: List[Dict[str, Any]] = []
+    raw_candidates = payload.get("candidates", [])
+    if not isinstance(raw_candidates, list):
+        raw_candidates = []
+
+    for item in raw_candidates:
+        if not isinstance(item, dict):
+            continue
+        pairs_raw = item.get("pairs", [])
+        if not isinstance(pairs_raw, list):
+            continue
+        pairs: List[Dict[str, Any]] = []
+        seen = set()
+        for p in pairs_raw:
+            if not isinstance(p, dict):
+                continue
+            src = str(p.get("source_col", "") or "").strip()
+            ref = str(p.get("reference_col", "") or "").strip()
+            p_type = str(p.get("type", "") or "").strip().lower()
+            if src not in valid_cols or ref not in valid_cols or not src or not ref or src == ref:
+                continue
+            if p_type not in {"objective", "subjective"}:
+                p_type = "objective"
+            key = (src, ref, p_type)
+            if key in seen:
+                continue
+            seen.add(key)
+            pairs.append(
+                {
+                    "source_col": src,
+                    "reference_col": ref,
+                    "type": p_type,
+                    "reason": str(p.get("reason", "") or "").strip(),
+                }
+            )
+        if not pairs:
+            continue
+        obj_pairs = [p for p in pairs if p["type"] == "objective"]
+        if not obj_pairs:
+            continue
+        try:
+            confidence = float(item.get("confidence", 0.0))
+        except Exception:
+            confidence = 0.0
+        confidence = max(0.0, min(1.0, confidence))
+        candidates.append(
+            {
+                "source_group": str(item.get("source_group", "") or ""),
+                "reference_group": str(item.get("reference_group", "") or ""),
+                "confidence": confidence,
+                "pairs": pairs,
+            }
+        )
+
+    selected = None
+    if candidates:
+        rec_idx = payload.get("recommended_index")
+        try:
+            rec_idx_int = int(rec_idx)
+        except Exception:
+            rec_idx_int = -1
+        if 0 <= rec_idx_int < len(candidates):
+            selected = candidates[rec_idx_int]
+        else:
+            selected = sorted(candidates, key=lambda x: x.get("confidence", 0.0), reverse=True)[0]
+
+    return {"candidates": candidates, "selected": selected}
+
+
+def build_reference_result_by_ark(
+    df: pd.DataFrame,
+    selected_candidate: Dict[str, Any],
+    batch_size: int = 30,
+) -> pd.Series:
+    """
+    Ark 逐行判定：
+    - 仅 objective 列参与 pass/fail
+    - subjective 列仅作为上下文
+    - comparable 由 Ark 判断
+    """
+    result = pd.Series([None] * len(df), dtype=object)
+    if not selected_candidate:
+        return result
+
+    pairs = selected_candidate.get("pairs", []) or []
+    objective_pairs = [p for p in pairs if str(p.get("type", "")).lower() == "objective"]
+    subjective_pairs = [p for p in pairs if str(p.get("type", "")).lower() == "subjective"]
+    if not objective_pairs:
+        return result
+
+    records: List[Dict[str, Any]] = []
+    for pos, (_, row) in enumerate(df.iterrows()):
+        obj_items = []
+        for p in objective_pairs:
+            s_col = p["source_col"]
+            r_col = p["reference_col"]
+            obj_items.append(
+                {
+                    "source_col": s_col,
+                    "source_value": str(row.get(s_col, "") or "").strip(),
+                    "reference_col": r_col,
+                    "reference_value": str(row.get(r_col, "") or "").strip(),
+                }
+            )
+        sub_items = []
+        for p in subjective_pairs:
+            s_col = p["source_col"]
+            r_col = p["reference_col"]
+            sub_items.append(
+                {
+                    "source_col": s_col,
+                    "source_value": str(row.get(s_col, "") or "").strip(),
+                    "reference_col": r_col,
+                    "reference_value": str(row.get(r_col, "") or "").strip(),
+                }
+            )
+        records.append({"idx": pos, "objective_pairs": obj_items, "subjective_pairs": sub_items})
+
+    for start in range(0, len(records), batch_size):
+        chunk = records[start : start + batch_size]
+        prompt = f"""
+你是作业质检判定助手。请逐条判断 each record 的 comparable 与 pass。
+规则：
+1) 仅 objective_pairs 参与 pass/fail 判定；
+2) subjective_pairs 不参与 pass/fail，只作为辅助上下文；
+3) 如果 objective 信息缺失或不可比较，comparable=false；
+4) comparable=true 时再给 pass=true/false。
+
+输入：
+{json.dumps(chunk, ensure_ascii=False)}
+
+仅输出 JSON：
+{{
+  "items": [
+    {{"idx": 0, "comparable": true, "pass": true}}
+  ]
+}}
+"""
+        try:
+            payload = _call_modelark_json(prompt)
+            items = payload.get("items", [])
+            if not isinstance(items, list):
+                continue
+            for it in items:
+                if not isinstance(it, dict):
+                    continue
+                try:
+                    idx = int(it.get("idx"))
+                except Exception:
+                    continue
+                if idx < 0 or idx >= len(result):
+                    continue
+                comparable = bool(it.get("comparable", False))
+                if not comparable:
+                    continue
+                passed = bool(it.get("pass", False))
+                result.iloc[idx] = "通过" if passed else "不通过"
+        except Exception as e:
+            print(f"[Ark逐行判定失败] batch={start // batch_size + 1}, err={e}")
+            continue
+
+    return result
 
 # 标准列名
 STANDARD_COLUMNS = ['初标人', '质检人', '质检结果', 'POC 姓名', '抽检结果']
@@ -92,7 +441,78 @@ MANUAL_NAME_ALIAS = {
     "limingxuan": "李洺萱",
     "mingxin": "张明昕",
     "zhangmingxin": "张明昕",
+    "weiqi": "李蔚祺",
+    "liweiqi": "李蔚祺",
+    "wanqi": "曾琬棋",
+    "zengwanqi": "曾琬棋",
+    "hanyi": "韩毅",
+    "zhangxuan": "张璇",
 }
+
+
+@dataclass
+class WorkflowComputeRequest:
+    source_url: str
+    sheet_refs: List[str] = field(default_factory=list)
+    sop_url: str = ""
+    manual_sop_score: Optional[float] = None
+    poc_owner: str = ""
+    result_url: str = ""
+    result_token: str = ""
+    result_sheet_ref: str = "产量&准确率统计"
+    append_write_back: bool = False
+    difficulty_coef: Optional[float] = None
+    project_display_name: str = ""
+    auth_mode: str = "user"
+    user_access_token: str = ""
+    user_token_file: str = ""
+    auto_refresh_user_token: bool = True
+    name_roster_file: str = str(NAME_ROSTER_DEFAULT_PATH)
+    operator: str = "panel"
+    header_row: Optional[int] = None
+    header_depth: str = "auto"
+    debug_b2b: bool = False
+    evaluate_poc_score: bool = True
+    reference_keywords: List[str] = field(default_factory=list)
+    objective_keywords: List[str] = field(default_factory=list)
+    subjective_keywords: List[str] = field(default_factory=list)
+    ark_reference_confidence_threshold: float = 0.6
+
+
+@dataclass
+class WorkflowComputeResult:
+    source_url: str
+    spreadsheet_token: str = ""
+    spreadsheet_title: str = ""
+    project_display_name: str = ""
+    poc_owner: str = ""
+    sheet_refs: List[str] = field(default_factory=list)
+    sheets: List[Dict[str, Any]] = field(default_factory=list)
+    snapshots: List[Dict[str, Any]] = field(default_factory=list)
+    project_aggregate_preview: Dict[str, Any] = field(default_factory=dict)
+    poc_score_preview: Dict[str, Any] = field(default_factory=dict)
+    logs: List[str] = field(default_factory=list)
+    warnings: List[str] = field(default_factory=list)
+    errors: List[Dict[str, Any]] = field(default_factory=list)
+
+
+@dataclass
+class WritebackTarget:
+    result_url: str = ""
+    result_token: str = ""
+    result_sheet_ref: str = "产量&准确率统计"
+    append_mode: bool = False
+    auth_mode: str = "user"
+    user_access_token: str = ""
+    user_token_file: str = ""
+    auto_refresh_user_token: bool = True
+
+
+@dataclass
+class WritebackResult:
+    success_count: int = 0
+    failed_count: int = 0
+    details: List[Dict[str, Any]] = field(default_factory=list)
 
 
 def num_to_col(n: int) -> str:
@@ -114,22 +534,182 @@ def get_tenant_access_token(app_id: str, app_secret: str) -> str:
     return data["tenant_access_token"]
 
 
-def get_user_access_token(user_access_token: Optional[str] = None) -> str:
-    """获取 user_access_token（优先参数，其次环境变量 FEISHU_USER_ACCESS_TOKEN）。"""
-    token = (user_access_token or FEISHU_USER_ACCESS_TOKEN or "").strip()
-    if not token:
-        raise Exception(
-            "未提供 user_access_token。请通过 --user-access-token 传入，"
-            "或设置环境变量 FEISHU_USER_ACCESS_TOKEN。"
-        )
-    return token
+def _parse_shell_kv_line(line: str) -> Tuple[Optional[str], Optional[str]]:
+    line = (line or "").strip()
+    if not line or line.startswith("#") or "=" not in line:
+        return None, None
+    key, value = line.split("=", 1)
+    key = key.strip()
+    value = value.strip()
+    if value.startswith(("'", '"')) and value.endswith(("'", '"')) and len(value) >= 2:
+        value = value[1:-1]
+    return key, value
 
 
-def resolve_feishu_access_token(auth_mode: str, user_access_token: Optional[str] = None) -> str:
+def _load_user_token_store(token_file: str) -> Dict[str, Any]:
+    path = Path(token_file).expanduser()
+    if not path.exists():
+        return {}
+    text = path.read_text(encoding="utf-8").strip()
+    if not text:
+        return {}
+    if path.suffix.lower() == ".json":
+        data = json.loads(text)
+        return data if isinstance(data, dict) else {}
+    data: Dict[str, Any] = {}
+    for raw in text.splitlines():
+        key, value = _parse_shell_kv_line(raw)
+        if key:
+            data[key] = value
+    out: Dict[str, Any] = {}
+    if data.get("FEISHU_USER_ACCESS_TOKEN"):
+        out["access_token"] = data["FEISHU_USER_ACCESS_TOKEN"]
+    if data.get("FEISHU_REFRESH_TOKEN"):
+        out["refresh_token"] = data["FEISHU_REFRESH_TOKEN"]
+    if data.get("FEISHU_ACCESS_EXPIRE_AT"):
+        try:
+            out["expire_at"] = int(float(data["FEISHU_ACCESS_EXPIRE_AT"]))
+        except Exception:
+            pass
+    return out
+
+
+def _save_user_token_store(token_file: str, token_data: Dict[str, Any]) -> None:
+    path = Path(token_file).expanduser()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    access_token = str(token_data.get("access_token", "") or "")
+    refresh_token = str(token_data.get("refresh_token", "") or "")
+    expires_in = int(token_data.get("expires_in", 0) or 0)
+    updated_at = int(token_data.get("updated_at", int(time.time())) or int(time.time()))
+    if expires_in > 0:
+        expire_at = updated_at + expires_in - 60
+    else:
+        expire_at = int(token_data.get("expire_at", updated_at) or updated_at)
+    if path.suffix.lower() == ".json":
+        payload = {
+            "access_token": access_token,
+            "refresh_token": refresh_token,
+            "expires_in": expires_in,
+            "updated_at": updated_at,
+            "expire_at": expire_at,
+        }
+        path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        return
+    content = (
+        f'FEISHU_USER_ACCESS_TOKEN="{access_token}"\n'
+        f'FEISHU_REFRESH_TOKEN="{refresh_token}"\n'
+        f'FEISHU_ACCESS_EXPIRE_AT="{expire_at}"\n'
+    )
+    path.write_text(content, encoding="utf-8")
+
+
+def _is_token_expiring(token_data: Dict[str, Any], threshold_sec: int = 120) -> bool:
+    now_ts = int(time.time())
+    expire_at = token_data.get("expire_at")
+    if expire_at is not None:
+        try:
+            return int(expire_at) - now_ts <= threshold_sec
+        except Exception:
+            return True
+    updated_at = token_data.get("updated_at")
+    expires_in = token_data.get("expires_in")
+    if updated_at is not None and expires_in is not None:
+        try:
+            return int(updated_at) + int(expires_in) - now_ts <= threshold_sec
+        except Exception:
+            return True
+    return True
+
+
+def _refresh_user_access_token(refresh_token: str, app_id: str, app_secret: str, host: str) -> Dict[str, Any]:
+    url = f"{host}/open-apis/authen/v1/refresh_access_token"
+    payload = {
+        "grant_type": "refresh_token",
+        "app_id": app_id,
+        "app_secret": app_secret,
+        "refresh_token": refresh_token,
+    }
+    resp = httpx.post(url, json=payload, timeout=20.0)
+    data = resp.json()
+    if data.get("code") != 0:
+        raise Exception(f"刷新 user_access_token 失败：code={data.get('code')} msg={data.get('msg')}")
+    payload_data = data.get("data") if isinstance(data.get("data"), dict) else data
+    payload_data["updated_at"] = int(time.time())
+    return payload_data
+
+
+def get_user_access_token(
+    user_access_token: Optional[str] = None,
+    user_token_file: Optional[str] = None,
+    auto_refresh: bool = True,
+) -> str:
+    """
+    获取 user_access_token。
+    优先级：
+    1) 显式传入 --user-access-token
+    2) token 文件（支持 .json 或 FEISHU_* env 样式文件）
+    3) 环境变量 FEISHU_USER_ACCESS_TOKEN
+    """
+    token = (user_access_token or "").strip()
+    if token:
+        return token
+
+    token_file = (user_token_file or FEISHU_USER_TOKEN_FILE or "").strip()
+    if token_file:
+        token_data = _load_user_token_store(token_file)
+        file_token = str(token_data.get("access_token", "") or "").strip()
+        if file_token and not _is_token_expiring(token_data):
+            return file_token
+        if auto_refresh:
+            refresh_token = str(token_data.get("refresh_token", "") or "").strip()
+            if refresh_token:
+                refreshed = _refresh_user_access_token(
+                    refresh_token=refresh_token,
+                    app_id=FEISHU_APP_ID,
+                    app_secret=FEISHU_APP_SECRET,
+                    host=FEISHU_OPEN_HOST,
+                )
+                merged = dict(token_data)
+                merged.update(
+                    {
+                        "access_token": refreshed.get("access_token", ""),
+                        "refresh_token": refreshed.get("refresh_token") or refresh_token,
+                        "expires_in": refreshed.get("expires_in", 0),
+                        "updated_at": refreshed.get("updated_at", int(time.time())),
+                    }
+                )
+                _save_user_token_store(token_file, merged)
+                new_token = str(merged.get("access_token", "") or "").strip()
+                if new_token:
+                    print(f"已自动刷新 user_access_token，并更新本地 token 文件：{token_file}")
+                    return new_token
+        if file_token:
+            return file_token
+
+    env_token = (FEISHU_USER_ACCESS_TOKEN or "").strip()
+    if env_token:
+        return env_token
+
+    raise Exception(
+        "未提供 user_access_token。请通过 --user-access-token 传入，"
+        "或设置 FEISHU_USER_TOKEN_FILE 并保存 refresh_token 以自动刷新。"
+    )
+
+
+def resolve_feishu_access_token(
+    auth_mode: str,
+    user_access_token: Optional[str] = None,
+    user_token_file: Optional[str] = None,
+    auto_refresh_user_token: bool = True,
+) -> str:
     """根据鉴权模式获取访问 token。"""
     mode = (auth_mode or "user").strip().lower()
     if mode == "user":
-        return get_user_access_token(user_access_token)
+        return get_user_access_token(
+            user_access_token=user_access_token,
+            user_token_file=user_token_file,
+            auto_refresh=auto_refresh_user_token,
+        )
     if mode == "tenant":
         return get_tenant_access_token(FEISHU_APP_ID, FEISHU_APP_SECRET)
     raise Exception(f"不支持的鉴权模式: {auth_mode}")
@@ -339,12 +919,12 @@ def is_blank_cell(v: Any) -> bool:
     return text == ""
 
 
-def normalize_header_cell(v: Any, col_index: int) -> str:
+def normalize_header_cell(v: Any, col_index: int, fallback_prefix: str = "col") -> str:
     """规范化表头单元格并保证非空"""
     if is_blank_cell(v):
-        return f"col_{col_index + 1}"
+        return f"{fallback_prefix}_{col_index + 1}"
     text = str(v).strip().replace("\n", " ")
-    return text if text else f"col_{col_index + 1}"
+    return text if text else f"{fallback_prefix}_{col_index + 1}"
 
 
 def score_header_row(row: list) -> float:
@@ -386,8 +966,98 @@ def score_header_row(row: list) -> float:
     )
 
 
-def build_dataframe_from_values(values: list, header_row: Optional[int] = None) -> pd.DataFrame:
-    """将飞书 values 构建为 DataFrame，支持自动识别表头行"""
+def _normalize_header_depth_value(header_depth: Any) -> str:
+    if header_depth is None:
+        return "auto"
+    text = str(header_depth).strip().lower()
+    if text in {"1", "2", "auto"}:
+        return text
+    return "auto"
+
+
+def _detect_multi_header_depth(norm_rows: list, header_idx: int) -> int:
+    """自动判断是否为双层表头（第一行分组 + 第二行叶子列名）。"""
+    if header_idx <= 0:
+        return 1
+
+    group_row = norm_rows[header_idx - 1]
+    leaf_row = norm_rows[header_idx]
+    non_empty_group = sum(0 if is_blank_cell(c) else 1 for c in group_row)
+    non_empty_leaf = sum(0 if is_blank_cell(c) else 1 for c in leaf_row)
+    if non_empty_group == 0 or non_empty_leaf == 0:
+        return 1
+    if non_empty_group > non_empty_leaf:
+        return 1
+
+    keywords = ["gt", "qc", "cc", "qa", "初标", "质检", "抽检", "review", "annotator", "source", "reference"]
+    group_values = [str(c).strip().lower() for c in group_row if not is_blank_cell(c)]
+    group_hit = sum(1 for x in group_values if any(k in x for k in keywords))
+
+    # 分组行常见特征：非空更少、重复更高、文本更短
+    unique_group = len(set(group_values)) if group_values else 0
+    avg_group_len = float(np.mean([len(x) for x in group_values])) if group_values else 0.0
+    sparse_score = (non_empty_leaf - non_empty_group) >= 1
+    repeat_score = unique_group <= max(1, non_empty_group - 1)
+    short_score = avg_group_len <= 24
+    keyword_score = group_hit >= 1
+
+    if sum([sparse_score, repeat_score, short_score, keyword_score]) >= 2:
+        return 2
+    return 1
+
+
+def _build_headers_and_metadata(
+    norm_rows: list,
+    header_idx: int,
+    header_depth: int,
+) -> Tuple[List[str], List[Dict[str, Any]], Optional[int]]:
+    leaf_row = norm_rows[header_idx]
+    group_idx = header_idx - 1 if header_depth == 2 and header_idx > 0 else None
+    group_row = norm_rows[group_idx] if group_idx is not None else None
+
+    group_names: List[str] = []
+    if group_row is not None:
+        current = ""
+        for cell in group_row:
+            if is_blank_cell(cell):
+                group_names.append(current)
+                continue
+            current = str(cell).strip().replace("\n", " ")
+            group_names.append(current)
+    else:
+        group_names = [""] * len(leaf_row)
+
+    headers: List[str] = []
+    metadata: List[Dict[str, Any]] = []
+    seen: Dict[str, int] = {}
+    for i, leaf_cell in enumerate(leaf_row):
+        leaf_name = normalize_header_cell(leaf_cell, i, fallback_prefix="col")
+        group_name = (group_names[i] if i < len(group_names) else "").strip()
+        base_name = f"{group_name}::{leaf_name}" if group_name else leaf_name
+        cnt = seen.get(base_name, 0)
+        seen[base_name] = cnt + 1
+        col_name = f"{base_name}__{cnt + 1}" if cnt > 0 else base_name
+        headers.append(col_name)
+        metadata.append(
+            {
+                "index": i,
+                "group_name": group_name,
+                "leaf_name": leaf_name,
+                "full_name": base_name,
+                "column_name": col_name,
+            }
+        )
+
+    header_group_row = (group_idx + 1) if group_idx is not None else None
+    return headers, metadata, header_group_row
+
+
+def build_dataframe_from_values(
+    values: list,
+    header_row: Optional[int] = None,
+    header_depth: Any = "auto",
+) -> pd.DataFrame:
+    """将飞书 values 构建为 DataFrame，支持自动识别单/双层表头。"""
     if not values:
         raise Exception("表格为空")
 
@@ -411,27 +1081,31 @@ def build_dataframe_from_values(values: list, header_row: Optional[int] = None) 
         # 传入为 1-based 行号
         header_idx = max(0, min(len(norm_rows) - 1, header_row - 1))
 
-    raw_headers = norm_rows[header_idx]
-    headers = []
-    seen = {}
-    for i, cell in enumerate(raw_headers):
-        name = normalize_header_cell(cell, i)
-        cnt = seen.get(name, 0)
-        seen[name] = cnt + 1
-        if cnt > 0:
-            name = f"{name}__{cnt+1}"
-        headers.append(name)
+    depth_cfg = _normalize_header_depth_value(header_depth)
+    if depth_cfg == "1":
+        depth = 1
+    elif depth_cfg == "2":
+        depth = 2 if header_idx > 0 else 1
+    else:
+        depth = _detect_multi_header_depth(norm_rows, header_idx)
 
-    body_rows = norm_rows[header_idx + 1:]
+    headers, metadata, header_group_row = _build_headers_and_metadata(norm_rows, header_idx, depth)
+    body_rows = norm_rows[header_idx + 1 :]
     # 丢弃全空行
     body_rows = [r for r in body_rows if any(not is_blank_cell(c) for c in r)]
     if not body_rows:
         df = pd.DataFrame(columns=headers)
         df.attrs["header_row"] = header_idx + 1
+        df.attrs["header_depth"] = depth
+        df.attrs["header_group_row"] = header_group_row
+        df.attrs["column_metadata"] = metadata
         return df
 
     df = pd.DataFrame(body_rows, columns=headers)
     df.attrs["header_row"] = header_idx + 1
+    df.attrs["header_depth"] = depth
+    df.attrs["header_group_row"] = header_group_row
+    df.attrs["column_metadata"] = metadata
     return df
 
 
@@ -549,7 +1223,8 @@ def read_feishu_sheet(
     spreadsheet_token: str,
     sheet_name: str = None,
     token: str = None,
-    header_row: Optional[int] = None
+    header_row: Optional[int] = None,
+    header_depth: Any = "auto",
 ) -> pd.DataFrame:
     """
     读取飞书表格数据
@@ -618,7 +1293,7 @@ def read_feishu_sheet(
         or spreadsheet_token
     )
 
-    end_col = num_to_col(min(column_count, 52))  # 最多到 AZ 列
+    end_col = num_to_col(min(column_count, 702))
 
     def fetch_values_range(start_row: int, end_row: int) -> dict:
         range_str_local = f"{sheet_id}!A{start_row}:{end_col}{end_row}"
@@ -665,7 +1340,7 @@ def read_feishu_sheet(
     if not values:
         raise Exception("表格为空")
 
-    df = build_dataframe_from_values(values, header_row=header_row)
+    df = build_dataframe_from_values(values, header_row=header_row, header_depth=header_depth)
     df.attrs["spreadsheet_token"] = spreadsheet_token
     df.attrs["spreadsheet_title"] = spreadsheet_title
     df.attrs["sheet_id"] = sheet_id
@@ -1157,7 +1832,100 @@ def is_valid_actor_column(series: pd.Series) -> bool:
         return False
     if q["unique_ratio"] > 0.98 and q["count"] >= 20:
         return False
-    return True
+    s = series.dropna().astype(str).str.strip()
+    s = s[s != ""]
+    if s.empty:
+        return False
+
+    blocked = {"yes", "no", "true", "false", "y", "n", "0", "1", "na", "n/a", "none", "null"}
+    normalized = s.str.lower().str.strip()
+    blocked_ratio = float(normalized.isin(blocked).mean())
+    if blocked_ratio >= 0.5:
+        return False
+
+    def _is_name_like(v: str) -> bool:
+        t = str(v).strip()
+        if not t:
+            return False
+        # 常见供应商后缀，不参与姓名判断
+        t = re.sub(r"_(tmx|appen|校企|cl)$", "", t, flags=re.I).strip()
+        if not t:
+            return False
+        # 中文姓名（含中间点）
+        if re.match(r"^[\u4e00-\u9fff·]{2,20}$", t):
+            return True
+        # 拼音/英文人名（支持空格、连字符、撇号）
+        if re.match(r"^[A-Za-z][A-Za-z .'\-]{1,40}$", t):
+            return True
+        return False
+
+    name_like_ratio = float(s.apply(_is_name_like).mean())
+    return name_like_ratio >= 0.5
+
+
+def _extract_first_json_dict(text: str) -> Dict[str, Any]:
+    txt = (text or "").strip()
+    if not txt:
+        raise ValueError("empty json text")
+    fenced = re.search(r"```json\s*(\{[\s\S]*?\})\s*```", txt, flags=re.I)
+    if fenced:
+        return json.loads(fenced.group(1))
+    direct = re.search(r"(\{[\s\S]*\})", txt)
+    if direct:
+        return json.loads(direct.group(1))
+    raise ValueError("json object not found")
+
+
+def is_person_name_column_by_ark(col_name: Any, series: pd.Series) -> bool:
+    """
+    让 Ark 判断该列是否是“人名列”。
+    判定标准：值应主要是中文姓名、拼音或外文人名；若多为 yes/no 等标签则判否。
+    """
+    s = series.dropna().astype(str).str.strip()
+    s = s[s != ""]
+    if s.empty:
+        return False
+
+    samples = s.drop_duplicates().head(30).tolist()
+    prompt = f"""
+你是数据字段识别专家。请判断一个列是否是“人名列”。
+要求：人名列的值应主要是中文姓名、中文拼音、或外文人名。
+若值主要是 yes/no、true/false、通过/不通过、分数、国家、标签、句子，则不是人名列。
+
+列名: {str(col_name)}
+样本值: {json.dumps(samples, ensure_ascii=False)}
+
+只输出 JSON:
+{{
+  "is_person_name_column": true,
+  "reason": "一句话原因"
+}}
+"""
+    try:
+        output = call_modelark_text(prompt)
+        payload = _extract_first_json_dict(output)
+        return bool(payload.get("is_person_name_column", False))
+    except Exception as e:
+        print(f"[Ark人名校验失败] 列 '{col_name}'，错误：{e}")
+        # Ark 失败时回退到规则判断，确保流程可继续
+        return is_valid_actor_column(series)
+
+
+def validate_actor_mappings_with_ark(mapping: dict, df: Optional[pd.DataFrame]) -> dict:
+    """对人员列映射逐列二次校验；非人名列将被剔除。"""
+    if df is None or df.empty or not mapping:
+        return mapping
+
+    actor_std_cols = {"初标人", "质检人", "POC 姓名"}
+    for actual, std in list(mapping.items()):
+        if std not in actor_std_cols:
+            continue
+        if actual not in df.columns:
+            continue
+        if not is_person_name_column_by_ark(actual, df[actual]):
+            print(f"[人名校验拦截] 列 '{actual}' 并非人名列，移除映射 '{actual}' -> '{std}'")
+            del mapping[actual]
+    return mapping
 
 
 def sanitize_standard_columns(df: pd.DataFrame) -> pd.DataFrame:
@@ -1782,7 +2550,7 @@ def build_panel_snapshot(
     project_meta = {
         "project_id": project_id,
         "project_group_id": spreadsheet_token,
-        "project_group_name": (spreadsheet_title or spreadsheet_token),
+        "project_group_name": (project_display_name or spreadsheet_title or spreadsheet_token),
         "spreadsheet_token": spreadsheet_token,
         "sheet_ref": sheet_ref,
         "sheet_title": sheet_title or sheet_ref,
@@ -1801,8 +2569,15 @@ def build_panel_snapshot(
         "args": {
             "sheet": args.sheet,
             "header_row": args.header_row,
+            "header_depth": getattr(args, "header_depth", "auto"),
             "sop_url": args.sop_url or "",
+            "manual_sop_score": args.manual_sop_score if hasattr(args, "manual_sop_score") else None,
+            "poc_owner": args.poc_owner if hasattr(args, "poc_owner") else "",
             "result_sheet": args.result_sheet,
+            "reference_keywords": getattr(args, "reference_keywords", []) or [],
+            "objective_keywords": getattr(args, "objective_keywords", []) or [],
+            "subjective_keywords": getattr(args, "subjective_keywords", []) or [],
+            "ark_reference_confidence_threshold": getattr(args, "ark_reference_confidence_threshold", 0.6),
             "no_write_back": bool(args.no_write_back),
         },
     }
@@ -1821,6 +2596,499 @@ def build_panel_snapshot(
         "project_metrics_base": project_rows,
         "project_summary_metrics": project_rows,
     }
+
+
+def _coerce_compute_request(request: Any) -> WorkflowComputeRequest:
+    if isinstance(request, WorkflowComputeRequest):
+        return request
+    if isinstance(request, dict):
+        data = dict(request)
+        flags = data.get("flags") if isinstance(data.get("flags"), dict) else {}
+
+        def _as_keyword_list(v: Any) -> List[str]:
+            if v is None:
+                return []
+            if isinstance(v, str):
+                parts = re.split(r"[,\n，;；|]+", v)
+            elif isinstance(v, (list, tuple, set)):
+                parts = [str(x) for x in v]
+            else:
+                parts = [str(v)]
+            return [str(x).strip() for x in parts if str(x).strip()]
+
+        header_depth_raw = data.get("header_depth", flags.get("header_depth", "auto"))
+        threshold_raw = data.get(
+            "ark_reference_confidence_threshold",
+            flags.get("ark_reference_confidence_threshold", 0.6),
+        )
+        try:
+            threshold = float(threshold_raw)
+        except Exception:
+            threshold = 0.6
+
+        return WorkflowComputeRequest(
+            source_url=str(data.get("source_url", "")),
+            sheet_refs=[str(x) for x in (data.get("sheet_refs") or [])],
+            sop_url=str(data.get("sop_url", "") or ""),
+            manual_sop_score=data.get("manual_sop_score"),
+            poc_owner=str(data.get("poc_owner", "") or ""),
+            result_url=str(data.get("result_url", "") or ""),
+            result_token=str(data.get("result_token", "") or ""),
+            result_sheet_ref=str(data.get("result_sheet_ref", "产量&准确率统计") or "产量&准确率统计"),
+            append_write_back=bool(data.get("append_write_back", False)),
+            difficulty_coef=data.get("difficulty_coef"),
+            project_display_name=str(data.get("project_display_name", "") or ""),
+            auth_mode=str(data.get("auth_mode", "user") or "user"),
+            user_access_token=str(data.get("user_access_token", "") or ""),
+            user_token_file=str(data.get("user_token_file", "") or ""),
+            auto_refresh_user_token=bool(data.get("auto_refresh_user_token", True)),
+            name_roster_file=str(data.get("name_roster_file", str(NAME_ROSTER_DEFAULT_PATH))),
+            operator=str(data.get("operator", "panel") or "panel"),
+            header_row=data.get("header_row"),
+            header_depth=str(header_depth_raw or "auto"),
+            debug_b2b=bool(data.get("debug_b2b", False)),
+            evaluate_poc_score=bool(data.get("evaluate_poc_score", True)),
+            reference_keywords=_as_keyword_list(data.get("reference_keywords", flags.get("reference_keywords"))),
+            objective_keywords=_as_keyword_list(data.get("objective_keywords", flags.get("objective_keywords"))),
+            subjective_keywords=_as_keyword_list(data.get("subjective_keywords", flags.get("subjective_keywords"))),
+            ark_reference_confidence_threshold=threshold,
+        )
+    raise TypeError(f"不支持的 request 类型: {type(request)}")
+
+
+def _coerce_writeback_target(target: Any) -> WritebackTarget:
+    if isinstance(target, WritebackTarget):
+        return target
+    if isinstance(target, dict):
+        data = dict(target)
+        return WritebackTarget(
+            result_url=str(data.get("result_url", "") or ""),
+            result_token=str(data.get("result_token", "") or ""),
+            result_sheet_ref=str(data.get("result_sheet_ref", "产量&准确率统计") or "产量&准确率统计"),
+            append_mode=bool(data.get("append_mode", False)),
+            auth_mode=str(data.get("auth_mode", "user") or "user"),
+            user_access_token=str(data.get("user_access_token", "") or ""),
+            user_token_file=str(data.get("user_token_file", "") or ""),
+            auto_refresh_user_token=bool(data.get("auto_refresh_user_token", True)),
+        )
+    raise TypeError(f"不支持的 target 类型: {type(target)}")
+
+
+def _resolve_source_spreadsheet(source_url: str, token: str) -> Tuple[str, Optional[str], str]:
+    src = str(source_url or "").strip()
+    if not src:
+        raise ValueError("source_url 不能为空")
+
+    if re.fullmatch(r"[A-Za-z0-9]{10,}", src):
+        return src, None, f"https://bytedance.larkoffice.com/sheets/{src}"
+
+    spreadsheet_token, spreadsheet_title = resolve_spreadsheet_info_from_url(src, token)
+    return spreadsheet_token, spreadsheet_title, src
+
+
+def _normalize_sheet_refs_for_source(source_url: str, spreadsheet_token: str, sheet_refs: List[str]) -> List[str]:
+    out: List[str] = []
+    for ref in (sheet_refs or []):
+        item = str(ref or "").strip()
+        if not item:
+            continue
+
+        if re.search(r"https?://", item):
+            token_match = re.search(r"sheets/([a-zA-Z0-9]+)", item)
+            if not token_match:
+                raise ValueError(f"sheet_refs 中包含非法 URL：{item}")
+            token_in_ref = token_match.group(1)
+            if token_in_ref != spreadsheet_token:
+                raise ValueError(f"sheet_refs 跨 spreadsheet，不允许混用：{item}")
+            sheet_ref = extract_sheet_ref_from_url(item)
+            if not sheet_ref:
+                raise ValueError(f"sheet URL 缺少 ?sheet= 参数：{item}")
+            out.append(sheet_ref)
+            continue
+
+        out.append(item)
+
+    if not out:
+        from_url = extract_sheet_ref_from_url(source_url)
+        if from_url:
+            out.append(from_url)
+
+    if not out:
+        out.append("Sheet1")
+
+    uniq: List[str] = []
+    seen = set()
+    for ref in out:
+        if ref in seen:
+            continue
+        seen.add(ref)
+        uniq.append(ref)
+    return uniq
+
+
+def _aggregate_project_preview(snapshots: List[Dict[str, Any]]) -> Dict[str, Any]:
+    person_rows: List[Dict[str, Any]] = []
+    person_set = set()
+    for s in snapshots:
+        for row in (s.get("person_metrics_base") or []):
+            person_rows.append(row)
+            name = str(row.get("person_name", "")).strip()
+            if name:
+                person_set.add(name)
+
+    if not person_rows:
+        return {
+            "sheet_count": len(snapshots),
+            "person_count": 0,
+            "project_metrics": [],
+        }
+
+    by_role: Dict[str, Dict[str, float]] = {}
+    for row in person_rows:
+        role = row.get("role") or "未知"
+        agg = by_role.setdefault(
+            role,
+            {
+                "volume_total": 0.0,
+                "inspected_total": 0.0,
+                "pass_total": 0.0,
+                "weighted_num": 0.0,
+                "weighted_den": 0.0,
+            },
+        )
+        volume = parse_number(row.get("volume"))
+        inspected = parse_number(row.get("inspected_count"))
+        passed = parse_number(row.get("pass_count"))
+        weighted_acc = parse_number(row.get("weighted_accuracy"))
+
+        if volume is not None:
+            agg["volume_total"] += float(volume)
+        if inspected is not None:
+            agg["inspected_total"] += float(inspected)
+        if passed is not None:
+            agg["pass_total"] += float(passed)
+        if inspected is not None and inspected > 0 and weighted_acc is not None:
+            agg["weighted_num"] += float(weighted_acc) * float(inspected)
+            agg["weighted_den"] += float(inspected)
+
+    project_metrics = []
+    overall = {
+        "volume_total": 0.0,
+        "inspected_total": 0.0,
+        "pass_total": 0.0,
+        "weighted_num": 0.0,
+        "weighted_den": 0.0,
+    }
+    for role, agg in by_role.items():
+        inspected = agg["inspected_total"]
+        passed = agg["pass_total"]
+        accuracy = (passed / inspected) if inspected > 0 else None
+        weighted = (agg["weighted_num"] / agg["weighted_den"]) if agg["weighted_den"] > 0 else None
+        project_metrics.append(
+            {
+                "metric_group": role,
+                "volume_total": agg["volume_total"],
+                "inspected_total": inspected,
+                "pass_total": passed,
+                "accuracy": accuracy,
+                "weighted_accuracy": weighted,
+                "difficulty_coef": None,
+            }
+        )
+
+        if role in {"初标", "质检"}:
+            overall["volume_total"] += agg["volume_total"]
+            overall["inspected_total"] += inspected
+            overall["pass_total"] += passed
+            overall["weighted_num"] += agg["weighted_num"]
+            overall["weighted_den"] += agg["weighted_den"]
+
+    overall_accuracy = (
+        overall["pass_total"] / overall["inspected_total"] if overall["inspected_total"] > 0 else None
+    )
+    overall_weighted = (
+        overall["weighted_num"] / overall["weighted_den"] if overall["weighted_den"] > 0 else None
+    )
+    project_metrics.append(
+        {
+            "metric_group": "整体",
+            "volume_total": overall["volume_total"],
+            "inspected_total": overall["inspected_total"],
+            "pass_total": overall["pass_total"],
+            "accuracy": overall_accuracy,
+            "weighted_accuracy": overall_weighted,
+            "difficulty_coef": None,
+        }
+    )
+
+    return {
+        "sheet_count": len(snapshots),
+        "person_count": len(person_set),
+        "project_metrics": project_metrics,
+    }
+
+
+def compute_workflow(request: Any) -> WorkflowComputeResult:
+    """
+    程序化工作流入口：读取、识别、计算，返回预览结果（默认不入库、不写回）。
+    """
+    req = _coerce_compute_request(request)
+    result = WorkflowComputeResult(
+        source_url=req.source_url,
+        project_display_name=req.project_display_name or "",
+        poc_owner=req.poc_owner or "",
+    )
+
+    logs: List[str] = []
+    warnings: List[str] = []
+    errors: List[Dict[str, Any]] = []
+    result.logs = logs
+    result.warnings = warnings
+    result.errors = errors
+
+    token = resolve_feishu_access_token(
+        req.auth_mode,
+        req.user_access_token,
+        user_token_file=req.user_token_file,
+        auto_refresh_user_token=req.auto_refresh_user_token,
+    )
+    spreadsheet_token, spreadsheet_title_from_url, normalized_source_url = _resolve_source_spreadsheet(req.source_url, token)
+    result.spreadsheet_token = spreadsheet_token
+    result.spreadsheet_title = spreadsheet_title_from_url or spreadsheet_token
+    result.source_url = normalized_source_url
+
+    normalized_sheet_refs = _normalize_sheet_refs_for_source(normalized_source_url, spreadsheet_token, req.sheet_refs)
+    result.sheet_refs = normalized_sheet_refs
+
+    result_spreadsheet_token = (req.result_token or "").strip()
+    if req.result_url and not result_spreadsheet_token:
+        result_spreadsheet_token = resolve_spreadsheet_token_from_url(req.result_url, token)
+    if not result_spreadsheet_token:
+        result_spreadsheet_token = spreadsheet_token
+
+    roster = load_name_roster(req.name_roster_file)
+    alias_index = build_name_alias_index(roster) if roster else {}
+    if not roster:
+        warnings.append(f"姓名名单为空或不存在：{req.name_roster_file}")
+
+    for sheet_ref in normalized_sheet_refs:
+        logs.append(f"[开始] sheet={sheet_ref}")
+        try:
+            df = read_feishu_sheet(
+                spreadsheet_token,
+                sheet_ref,
+                token=token,
+                header_row=req.header_row,
+                header_depth=req.header_depth,
+            )
+
+            if is_summary_like_sheet(df):
+                raise Exception("当前源 sheet 更像统计结果页（非原始作业明细）")
+
+            mapping: Dict[str, str] = {}
+            schema_type = "normal"
+            if detect_back_to_back_schema(df):
+                schema_type = "b2b"
+                annotators, qas, pocs = calculate_back_to_back_annotator_stats(df, debug=req.debug_b2b)
+            else:
+                mapping = intelligent_column_mapping(df.columns.tolist(), df=df)
+                annotators, qas, pocs = calculate_accuracy_workflow(
+                    df,
+                    mapping,
+                    reference_keywords=req.reference_keywords,
+                    objective_keywords=req.objective_keywords,
+                    subjective_keywords=req.subjective_keywords,
+                    ark_reference_confidence_threshold=req.ark_reference_confidence_threshold,
+                )
+
+            difficulty = 1.0
+            difficulty_report = ""
+            if req.difficulty_coef is not None:
+                manual_diff = float(req.difficulty_coef)
+                if not (DIFFICULTY_MIN <= manual_diff <= DIFFICULTY_MAX):
+                    raise Exception(f"difficulty_coef 超出范围，需在 {DIFFICULTY_MIN:.2f}~{DIFFICULTY_MAX:.2f}")
+                difficulty = round(manual_diff, 2)
+            elif req.sop_url:
+                difficulty, difficulty_report = evaluate_difficulty_coefficient(req.sop_url, df, token)
+
+            annotators = apply_weighted_accuracy(annotators, "初标准确率", "加权初标准确率", difficulty)
+            qas = apply_weighted_accuracy(qas, "质检准确率", "加权质检准确率", difficulty)
+
+            if alias_index:
+                annotators, qas, pocs = apply_name_standardization(annotators, qas, pocs, alias_index)
+
+            class _Args:
+                operator = req.operator
+                sheet = sheet_ref
+                header_row = req.header_row
+                header_depth = req.header_depth
+                sop_url = req.sop_url
+                manual_sop_score = req.manual_sop_score
+                poc_owner = req.poc_owner
+                result_sheet = req.result_sheet_ref
+                reference_keywords = req.reference_keywords
+                objective_keywords = req.objective_keywords
+                subjective_keywords = req.subjective_keywords
+                ark_reference_confidence_threshold = req.ark_reference_confidence_threshold
+                no_write_back = True
+
+            snapshot = build_panel_snapshot(
+                spreadsheet_token=spreadsheet_token,
+                sheet_ref=str(df.attrs.get("sheet_id") or sheet_ref),
+                sheet_title=df.attrs.get("sheet_title"),
+                spreadsheet_title=(df.attrs.get("spreadsheet_title") or spreadsheet_title_from_url),
+                result_spreadsheet_token=result_spreadsheet_token,
+                result_sheet_ref=req.result_sheet_ref,
+                project_display_name=req.project_display_name or "",
+                annotators=annotators,
+                qas=qas,
+                pocs=pocs,
+                difficulty=difficulty,
+                args=_Args(),
+                mapping=mapping,
+            )
+
+            result.snapshots.append(snapshot)
+            result.sheets.append(
+                {
+                    "sheet_ref_input": sheet_ref,
+                    "sheet_ref": str(df.attrs.get("sheet_id") or sheet_ref),
+                    "sheet_title": str(df.attrs.get("sheet_title") or sheet_ref),
+                    "header_row": df.attrs.get("header_row"),
+                    "schema_type": schema_type,
+                    "mapping": mapping,
+                    "difficulty_coef": difficulty,
+                    "difficulty_report": difficulty_report,
+                    "sop_url": req.sop_url or "",
+                    "project_display_name": req.project_display_name or "",
+                    "poc_owner": req.poc_owner or "",
+                    "annotators": annotators.to_dict(orient="records"),
+                    "qas": qas.to_dict(orient="records"),
+                    "pocs": pocs.to_dict(orient="records"),
+                    "project_metrics_preview": snapshot.get("project_metrics_base", []),
+                }
+            )
+            logs.append(f"[成功] sheet={sheet_ref}, rows={len(df)}")
+        except Exception as e:
+            err = {"sheet_ref": sheet_ref, "error": str(e)}
+            errors.append(err)
+            warnings.append(f"sheet={sheet_ref} 计算失败：{e}")
+            logs.append(f"[失败] sheet={sheet_ref}, error={e}")
+
+    result.project_aggregate_preview = _aggregate_project_preview(result.snapshots)
+
+    should_score = req.evaluate_poc_score and bool(result.snapshots) and bool(req.sop_url or req.manual_sop_score is not None)
+    if should_score:
+        try:
+            from agent.orchestrator import run_task as run_agent_task
+            from agent.types import AgentTaskRequest
+
+            agent_req = AgentTaskRequest(
+                source_url=normalized_source_url,
+                sheet_refs=[str(s.get("sheet_ref")) for s in result.sheets if s.get("sheet_ref")],
+                sop_url=req.sop_url or "",
+                manual_sop_score=req.manual_sop_score,
+                poc_owner=req.poc_owner or "",
+                auth_mode=req.auth_mode,
+                user_access_token=req.user_access_token,
+                db_path="./metrics_panel.db",
+                operator=req.operator or "panel",
+                flags={
+                    "dry_run": True,
+                    "name_roster_file": req.name_roster_file,
+                    "project_display_name": req.project_display_name or "",
+                    "header_depth": req.header_depth,
+                    "reference_keywords": req.reference_keywords or [],
+                    "objective_keywords": req.objective_keywords or [],
+                    "subjective_keywords": req.subjective_keywords or [],
+                    "ark_reference_confidence_threshold": req.ark_reference_confidence_threshold,
+                },
+            )
+            agent_res = run_agent_task(agent_req)
+            result.poc_score_preview = {
+                "score_card": agent_res.score_card,
+                "warnings": agent_res.warnings,
+                "project_group_id": agent_res.project_group_id,
+            }
+            logs.append("[成功] 已完成 POC 评分预览")
+        except Exception as e:
+            warnings.append(f"POC评分预览失败：{e}")
+            logs.append(f"[失败] POC评分预览失败: {e}")
+
+    return result
+
+
+def persist_workflow_result(result: Any, db_path: str) -> List[str]:
+    """将 compute_workflow 结果写入面板 SQLite，返回 run_id 列表。"""
+    if save_run_snapshot is None:
+        raise Exception("panel_db.save_run_snapshot 不可用，无法入库")
+
+    if isinstance(result, WorkflowComputeResult):
+        snapshots = result.snapshots
+    elif isinstance(result, dict):
+        snapshots = (result or {}).get("snapshots", [])
+    else:
+        snapshots = getattr(result, "snapshots", [])
+    run_ids: List[str] = []
+    for snapshot in snapshots:
+        run_ids.append(save_run_snapshot(snapshot, db_path=db_path))
+    return run_ids
+
+
+def writeback_workflow_result(result: Any, target: Any) -> WritebackResult:
+    """将 compute_workflow 结果写回飞书结果表。"""
+    wb_target = _coerce_writeback_target(target)
+    token = resolve_feishu_access_token(
+        wb_target.auth_mode,
+        wb_target.user_access_token,
+        user_token_file=wb_target.user_token_file,
+        auto_refresh_user_token=wb_target.auto_refresh_user_token,
+    )
+
+    if isinstance(result, WorkflowComputeResult):
+        sheets = result.sheets
+        default_spreadsheet_token = result.spreadsheet_token
+    elif isinstance(result, dict):
+        sheets = (result or {}).get("sheets", [])
+        default_spreadsheet_token = (result or {}).get("spreadsheet_token", "")
+    else:
+        sheets = getattr(result, "sheets", [])
+        default_spreadsheet_token = getattr(result, "spreadsheet_token", "")
+
+    result_spreadsheet_token = (wb_target.result_token or "").strip()
+    if wb_target.result_url and not result_spreadsheet_token:
+        result_spreadsheet_token = resolve_spreadsheet_token_from_url(wb_target.result_url, token)
+    if not result_spreadsheet_token:
+        result_spreadsheet_token = default_spreadsheet_token
+    if not result_spreadsheet_token:
+        raise Exception("写回失败：无法确定结果表 spreadsheet_token")
+
+    writeback = WritebackResult()
+    for sheet in sheets:
+        sheet_label = sheet.get("sheet_title") or sheet.get("sheet_ref") or "-"
+        try:
+            annotators = pd.DataFrame(sheet.get("annotators", []))
+            qas = pd.DataFrame(sheet.get("qas", []))
+            pocs = pd.DataFrame(sheet.get("pocs", []))
+            write_stats_back_to_feishu(
+                spreadsheet_token=result_spreadsheet_token,
+                result_sheet_ref=wb_target.result_sheet_ref,
+                annotators=annotators,
+                qas=qas,
+                pocs=pocs,
+                token=token,
+                difficulty=float(sheet.get("difficulty_coef") or 1.0),
+                sop_url=sheet.get("sop_url", ""),
+                difficulty_report=sheet.get("difficulty_report", ""),
+                append_mode=wb_target.append_mode,
+            )
+            writeback.success_count += 1
+            writeback.details.append({"sheet": sheet_label, "status": "success", "error": ""})
+        except Exception as e:
+            writeback.failed_count += 1
+            writeback.details.append({"sheet": sheet_label, "status": "failed", "error": str(e)})
+
+    return writeback
 
 
 def format_df_for_console(df: pd.DataFrame, title: str, max_rows: int = 40) -> str:
@@ -1846,9 +3114,54 @@ def result_signal_score(series: pd.Series) -> float:
     s = s[s != ""]
     if s.empty:
         return 0.0
-    pass_hit = s.apply(lambda x: any(p.lower() in x for p in PASS_LABELS)).mean()
-    fail_hit = s.apply(lambda x: any(f.lower() in x for f in FAIL_LABELS)).mean()
-    return float(pass_hit + fail_hit)
+    # 结果列通常是短标签；长评论列即使包含 fail/pass 词根也不应当被视作结果列
+    short_s = s[s.str.len() <= 24]
+    if short_s.empty:
+        return 0.0
+    judged = short_s.apply(judge_pass_label)
+    hit = judged.notna().mean()
+    return float(hit)
+
+
+def is_result_series_usable(series: pd.Series, min_signal: float = 0.2) -> bool:
+    """判断结果列是否可用（包含可识别的通过/不通过信号）。"""
+    if series is None:
+        return False
+    signal = result_signal_score(series)
+    if signal < min_signal:
+        return False
+    non_empty = series.dropna().astype(str).str.strip()
+    non_empty = non_empty[non_empty != ""]
+    return not non_empty.empty
+
+
+def pick_original_result_column(df: pd.DataFrame) -> Optional[str]:
+    """
+    在原始/重命名后的表中挑选最像“质检结果”的原结果列，供低置信回退。
+    优先级：明确列名语义 + 值信号强度。
+    """
+    if df is None or df.empty:
+        return None
+    candidates: List[Tuple[float, str]] = []
+    keywords = ["verdict", "result", "质检结果", "审核结果", "cc", "qc", "qa", "通过", "不通过", "判定", "结论"]
+    for col in df.columns:
+        col_name = str(col)
+        s = df[col_name]
+        signal = result_signal_score(s)
+        if signal <= 0.0:
+            continue
+        name_l = col_name.lower()
+        name_bonus = 0.0
+        if col_name == "质检结果":
+            name_bonus += 2.0
+        if any(k in name_l for k in keywords):
+            name_bonus += 1.0
+        score = signal * 3.0 + name_bonus
+        candidates.append((score, col_name))
+    if not candidates:
+        return None
+    candidates.sort(key=lambda x: x[0], reverse=True)
+    return candidates[0][1]
 
 
 def infer_missing_mapping_by_data(df: pd.DataFrame, missing_standard: list) -> dict:
@@ -1936,7 +3249,20 @@ def infer_missing_mapping_by_data(df: pd.DataFrame, missing_standard: list) -> d
 def is_mapping_plausible(actual_col: Any, std_col: str) -> bool:
     """过滤明显不合理的映射，避免 Validation 列误映射到结果列"""
     name_l = str(actual_col).lower().strip()
+    if std_col == "POC 姓名":
+        poc_name_keywords = ["poc", "audit", "抽检", "终审", "三审", "owner", "负责人"]
+        # 仅当列名存在明确 POC 语义时映射为 POC，避免把通用 Name 列误判成 POC。
+        if not any(k in name_l for k in poc_name_keywords):
+            return False
     if std_col in ["质检结果", "抽检结果"]:
+        zh_keywords = ["通过", "不通过", "判定", "结论", "质检结果", "抽检结果"]
+        en_word_pattern = r"\b(verdict|result|pass|fail|qc|cc|qa)\b"
+        # 结果列名必须包含明确“结果/判定”语义，避免把完成状态或模型标记列误识别成结果列
+        if not (any(k in name_l for k in zh_keywords) or re.search(en_word_pattern, name_l)):
+            return False
+        # 评分列（如 DCG/score/rating）不应作为通过/不通过结果列
+        if any(x in name_l for x in ["dcg", "score", "rating", "打分", "评分"]):
+            return False
         if ("validation" in name_l or "check" in name_l) and "verdict" not in name_l:
             return False
     return True
@@ -1948,6 +3274,81 @@ def set_mapping_with_priority(mapping: dict, actual_col: Any, std_col: str) -> N
     for k in to_remove:
         del mapping[k]
     mapping[actual_col] = std_col
+
+
+def rebalance_actor_role_mapping(mapping: dict, df: Optional[pd.DataFrame]) -> dict:
+    """
+    角色回收策略：
+    - 若没有“初标人”，但存在“POC 姓名”且缺乏抽检语义，则将该列回收为“初标人”。
+    目的：避免通用 Name 列被 Ark 映射到 POC，导致人员产量全空。
+    """
+    if not mapping:
+        return mapping
+    mapped_std = set(mapping.values())
+    if "初标人" in mapped_std:
+        return mapping
+    col_names_l = [str(c).lower() for c in (list(df.columns) if df is not None else [])]
+    poc_cols = [col for col, std in mapping.items() if std == "POC 姓名"]
+    if poc_cols:
+        mapped_has_poc_result = "抽检结果" in mapped_std
+        has_poc_context = mapped_has_poc_result or any(
+            any(k in c for k in ["poc", "audit", "抽检", "终审", "三审"]) for c in col_names_l
+        )
+        if not has_poc_context:
+            poc_col = poc_cols[0]
+            print(f"[角色回收] 将 '{poc_col}' 从 'POC 姓名' 回收为 '初标人'（未检测到抽检语义）")
+            set_mapping_with_priority(mapping, poc_col, "初标人")
+
+    mapped_std = set(mapping.values())
+    # 若只有“质检人”而缺失“初标人”，且无明显质检语义，回收为初标人。
+    if "初标人" not in mapped_std and "质检人" in mapped_std:
+        qa_context_keywords = ["qc", "cc", "qa", "review", "reviewer", "质检", "复核", "抽检"]
+        has_qa_context = any(any(k in c for k in qa_context_keywords) for c in col_names_l)
+        if not has_qa_context:
+            qa_cols = [col for col, std in mapping.items() if std == "质检人"]
+            if qa_cols:
+                qa_col = qa_cols[0]
+                print(f"[角色回收] 将 '{qa_col}' 从 '质检人' 回收为 '初标人'（未检测到质检语义）")
+                set_mapping_with_priority(mapping, qa_col, "初标人")
+    return mapping
+
+
+def ensure_minimum_actor_mapping(mapping: dict, df: Optional[pd.DataFrame]) -> dict:
+    """最小人员映射兜底：至少尝试识别一个初标人列，避免详情页全空。"""
+    if df is None or df.empty:
+        return mapping
+    if "初标人" in set(mapping.values()):
+        return mapping
+
+    cols = list(df.columns)
+    name_like_keywords = ["name", "姓名", "annotator", "标注", "rater"]
+    candidates: List[Tuple[float, Any]] = []
+    for col in cols:
+        if col in mapping:
+            continue
+        name_l = str(col).lower()
+        bonus = 0.0
+        has_name_keyword = any(k in name_l for k in name_like_keywords)
+        if has_name_keyword:
+            bonus += 2.0
+        else:
+            # 无姓名语义的列不参与“最小人员映射”兜底，避免把业务类别列误当成人员列。
+            continue
+
+        # 对姓名语义列：本地规则或 Ark 任一判定为人名即可。
+        if not is_valid_actor_column(df[col]):
+            if not is_person_name_column_by_ark(col, df[col]):
+                continue
+        q = column_quality(df[col])
+        score = bonus + (1.0 - q["unique_ratio"]) * 1.5 + (35 - q["avg_len"]) * 0.02
+        candidates.append((score, col))
+    if not candidates:
+        return mapping
+    candidates.sort(key=lambda x: x[0], reverse=True)
+    picked = candidates[0][1]
+    print(f"[兜底映射] 追加映射：'{picked}' -> '初标人'")
+    set_mapping_with_priority(mapping, picked, "初标人")
+    return mapping
 
 
 def apply_high_confidence_overrides(actual_columns: list, mapping: dict) -> dict:
@@ -2110,11 +3511,21 @@ def intelligent_column_mapping(actual_columns: list, df: Optional[pd.DataFrame] 
                 print(f"[数据分布兜底] 识别到：'{actual}' -> '{std}'")
 
     mapping = apply_high_confidence_overrides(actual_columns, mapping)
+    mapping = validate_actor_mappings_with_ark(mapping, df)
+    mapping = rebalance_actor_role_mapping(mapping, df)
+    mapping = ensure_minimum_actor_mapping(mapping, df)
 
     return mapping
 
 # ================= 数据计算 =================
-def calculate_accuracy_workflow(df: pd.DataFrame, column_mapping: dict) -> tuple:
+def calculate_accuracy_workflow(
+    df: pd.DataFrame,
+    column_mapping: dict,
+    reference_keywords: Optional[List[str]] = None,
+    objective_keywords: Optional[List[str]] = None,
+    subjective_keywords: Optional[List[str]] = None,
+    ark_reference_confidence_threshold: float = 0.6,
+) -> tuple:
     """
     根据映射字典重命名列，并计算准确率
 
@@ -2122,12 +3533,62 @@ def calculate_accuracy_workflow(df: pd.DataFrame, column_mapping: dict) -> tuple
         tuple: (annotator_stats, qa_stats, poc_stats)
     """
     # 1. 重命名列
-    df = df.rename(columns=column_mapping)
+    df = df.rename(columns=column_mapping).copy()
 
     # 补齐缺失的标准列
     for col in STANDARD_COLUMNS:
         if col not in df.columns:
             df[col] = np.nan
+
+    # 原结果列优先：若已存在可用“质检结果”，不覆盖。
+    result_ready = ("质检结果" in df.columns) and is_result_series_usable(df["质检结果"], min_signal=0.15)
+
+    if result_ready:
+        print("[结果优先] 检测到可用原质检结果列，跳过 Ark 参考列判定。")
+    else:
+        threshold = float(0.6 if ark_reference_confidence_threshold is None else ark_reference_confidence_threshold)
+        ark_plan = infer_reference_pairs_with_ark(
+            df=df,
+            reference_keywords=reference_keywords,
+            objective_keywords=objective_keywords,
+            subjective_keywords=subjective_keywords,
+        )
+        selected = ark_plan.get("selected")
+        confidence = float((selected or {}).get("confidence", 0.0) or 0.0)
+
+        if selected and confidence >= threshold:
+            obj_cnt = sum(1 for p in (selected.get("pairs") or []) if p.get("type") == "objective")
+            print(
+                "[Ark参考列识别] 采用主候选："
+                f"source_group='{selected.get('source_group', '')}', "
+                f"reference_group='{selected.get('reference_group', '')}', "
+                f"objective_pairs={obj_cnt}, confidence={confidence:.2f}"
+            )
+            judged = build_reference_result_by_ark(df=df, selected_candidate=selected)
+            comparable = judged.notna()
+            df["质检结果"] = df["质检结果"].astype(object)
+            existing = df["质检结果"].apply(lambda x: not is_blank_cell(x))
+            write_mask = comparable & (~existing)
+            df.loc[write_mask, "质检结果"] = judged[write_mask]
+            print(f"[Ark逐行判定] 可比较行={int(comparable.sum())}, 新写入={int(write_mask.sum())}")
+        else:
+            fallback_col = pick_original_result_column(df)
+            if fallback_col:
+                print(
+                    "[低置信回退] Ark参考列置信度不足，"
+                    f"confidence={confidence:.2f} < threshold={threshold:.2f}，"
+                    f"回退原结果列='{fallback_col}'。"
+                )
+                if fallback_col != "质检结果":
+                    df["质检结果"] = df["质检结果"].astype(object)
+                    missing_mask = df["质检结果"].apply(is_blank_cell)
+                    df.loc[missing_mask, "质检结果"] = df.loc[missing_mask, fallback_col]
+            else:
+                print(
+                    "[低置信回退] Ark参考列置信度不足，且无可用原结果列；"
+                    "本批不计入准确率分母。"
+                )
+
     df = sanitize_standard_columns(df)
 
     # 2. 统计初标人表现
@@ -2142,8 +3603,8 @@ def calculate_accuracy_workflow(df: pd.DataFrame, column_mapping: dict) -> tuple
         annotator_qa_stats = pd.DataFrame()
         if not df_annotator_qa.empty:
             def qa_stats(x):
-                qa_results = x['质检结果'].astype(str).str.lower().str.strip()
-                pass_count = sum(1 for r in qa_results if any(p.lower() in r for p in PASS_LABELS))
+                qa_results = x['质检结果'].tolist()
+                pass_count = sum(1 for r in qa_results if judge_pass_label(r) is True)
                 return pd.Series({
                     '被质检数': len(x),
                     '质检通过数': pass_count
@@ -2179,8 +3640,8 @@ def calculate_accuracy_workflow(df: pd.DataFrame, column_mapping: dict) -> tuple
         qa_acc_stats = pd.DataFrame()
         if not df_qa_accuracy.empty:
             def poc_stats(x):
-                poc_results = x['抽检结果'].astype(str).str.lower().str.strip()
-                pass_count = sum(1 for r in poc_results if any(p.lower() in r for p in PASS_LABELS))
+                poc_results = x['抽检结果'].tolist()
+                pass_count = sum(1 for r in poc_results if judge_pass_label(r) is True)
                 return pd.Series({
                     '被抽检数': len(x),
                     '抽检通过数': pass_count
@@ -2219,6 +3680,7 @@ def main():
     parser.add_argument("spreadsheet_token", nargs="?", help="飞书表格 URL 中的 token")
     parser.add_argument("--sheet", default="Sheet1", help="工作表名称，默认 Sheet1")
     parser.add_argument("--header-row", type=int, help="可选：指定表头所在行号（1-based）。不填则自动识别")
+    parser.add_argument("--header-depth", choices=["auto", "1", "2"], default="auto", help="表头层级：auto/1/2，默认 auto")
     parser.add_argument("--output", "-o", help="输出 Excel 文件路径")
     parser.add_argument("--url", help="飞书表格完整 URL（可选，替代直接提供 token）")
     parser.add_argument("--result-url", help="结果写入目标飞书表格 URL（可选，不填则写回源表）")
@@ -2231,14 +3693,26 @@ def main():
     parser.add_argument("--no-write-back", action="store_true", help="仅计算/导出，不写回飞书表格")
     parser.add_argument("--auth-mode", choices=["user", "tenant"], default="user", help="飞书鉴权模式，默认 user")
     parser.add_argument("--user-access-token", help="飞书 user_access_token（不填则读 FEISHU_USER_ACCESS_TOKEN）")
+    parser.add_argument("--user-token-file", default=FEISHU_USER_TOKEN_FILE, help="本地 token 文件路径（支持 .json 或 FEISHU_* env 样式）。设置后可自动刷新")
+    parser.add_argument("--disable-user-token-auto-refresh", action="store_true", help="禁用 user token 自动刷新")
     parser.add_argument("--debug-b2b", action="store_true", help="输出背靠背初标计算调试信息")
     parser.add_argument("--db-path", default="./metrics_panel.db", help="面板 SQLite 文件路径")
     parser.add_argument("--disable-panel-sync", action="store_true", help="禁用面板 SQLite 同步")
     parser.add_argument("--strict-sync", action="store_true", help="面板同步失败时阻断主流程")
     parser.add_argument("--project-display-name", help="项目展示名（用于面板）")
     parser.add_argument("--operator", help="操作人（用于审计字段）")
+    parser.add_argument("--enable-agent-poc-score", action="store_true", help="启用 Agent POC 评分链路（默认关闭）")
+    parser.add_argument("--manual-sop-score", type=float, help="缺失 SOP 时手工输入 SOP 分（0-100）")
+    parser.add_argument("--poc-owner", help="POC 负责人手动兜底")
+    parser.add_argument("--reference-keywords", default="", help="参考侧关键词（逗号分隔），用于 Ark 列组识别")
+    parser.add_argument("--objective-keywords", default="", help="客观字段关键词（逗号分隔），用于 Ark 列组识别")
+    parser.add_argument("--subjective-keywords", default="", help="主观字段关键词（逗号分隔），用于 Ark 列组识别")
+    parser.add_argument("--ark-reference-confidence-threshold", type=float, default=0.6, help="Ark 参考列识别置信阈值，默认 0.6")
 
     args = parser.parse_args()
+    args.reference_keywords = _normalize_keyword_values(args.reference_keywords, DEFAULT_REFERENCE_KEYWORDS)
+    args.objective_keywords = _normalize_keyword_values(args.objective_keywords, DEFAULT_OBJECTIVE_KEYWORDS)
+    args.subjective_keywords = _normalize_keyword_values(args.subjective_keywords, DEFAULT_SUBJECTIVE_KEYWORDS)
 
     # 解析 URL 或 token
     source_url = args.url or ""
@@ -2261,7 +3735,12 @@ def main():
             result_spreadsheet_token = m.group(1)
 
     try:
-        token = resolve_feishu_access_token(args.auth_mode, args.user_access_token)
+        token = resolve_feishu_access_token(
+            args.auth_mode,
+            args.user_access_token,
+            user_token_file=args.user_token_file,
+            auto_refresh_user_token=not args.disable_user_token_auto_refresh,
+        )
         print(f"飞书鉴权模式：{args.auth_mode}")
 
         if source_url and not spreadsheet_token:
@@ -2284,7 +3763,8 @@ def main():
             spreadsheet_token,
             args.sheet,
             token=token,
-            header_row=args.header_row
+            header_row=args.header_row,
+            header_depth=args.header_depth,
         )
         print(f"读取成功，共 {len(df)} 行数据")
         if df.attrs.get("header_row"):
@@ -2306,7 +3786,14 @@ def main():
 
             # 3. 计算指标
             print("\n--- 开始计算数据指标 ---")
-            annotators, qas, pocs = calculate_accuracy_workflow(df, mapping)
+            annotators, qas, pocs = calculate_accuracy_workflow(
+                df,
+                mapping,
+                reference_keywords=args.reference_keywords,
+                objective_keywords=args.objective_keywords,
+                subjective_keywords=args.subjective_keywords,
+                ark_reference_confidence_threshold=args.ark_reference_confidence_threshold,
+            )
 
         # 4. 评估最终难度系数
         difficulty = 1.0
@@ -2428,6 +3915,52 @@ def main():
                 if args.strict_sync:
                     raise Exception(f"面板同步失败：{sync_err}") from e
                 print(f"[面板同步警告] {sync_err}")
+
+        # 10. 可选：Agent POC 评分（LLM 主评分）
+        if args.enable_agent_poc_score:
+            try:
+                from agent.orchestrator import run_task as run_agent_task
+                from agent.types import AgentTaskRequest
+
+                source_for_agent = source_url or f"https://bytedance.larkoffice.com/sheets/{spreadsheet_token}?sheet={args.sheet}"
+                req = AgentTaskRequest(
+                    source_url=source_for_agent,
+                    sheet_refs=[str(df.attrs.get("sheet_id") or args.sheet)],
+                    sop_url=args.sop_url or "",
+                    manual_sop_score=args.manual_sop_score,
+                    poc_owner=args.poc_owner or "",
+                    auth_mode=args.auth_mode,
+                    user_access_token=args.user_access_token or "",
+                    db_path=args.db_path,
+                    operator=args.operator or "workflow",
+                    result_target={
+                        "spreadsheet_token": result_spreadsheet_token,
+                        "result_sheet_ref": args.result_sheet,
+                    },
+                    flags={
+                        "name_roster_file": args.name_roster_file,
+                        "difficulty_coef": difficulty,
+                        "project_display_name": args.project_display_name or "",
+                        "header_depth": args.header_depth,
+                        "reference_keywords": args.reference_keywords or [],
+                        "objective_keywords": args.objective_keywords or [],
+                        "subjective_keywords": args.subjective_keywords or [],
+                        "ark_reference_confidence_threshold": args.ark_reference_confidence_threshold,
+                        "skip_run_snapshot": True,
+                    },
+                )
+                agent_result = run_agent_task(req)
+                print(
+                    "[Agent评分] 完成："
+                    f"project_group_id={agent_result.project_group_id}, "
+                    f"score_id={agent_result.poc_score_id}, "
+                    f"score={agent_result.score_card.get('poc_total_score')}"
+                )
+            except Exception as e:
+                msg = f"[Agent评分警告] 失败：{e}"
+                if args.strict_sync:
+                    raise Exception(msg) from e
+                print(msg)
 
         return annotators, qas, pocs
 

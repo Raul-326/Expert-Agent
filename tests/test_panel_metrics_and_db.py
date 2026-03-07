@@ -3,12 +3,20 @@ import unittest
 
 from panel_db import (
     apply_override,
+    get_boss_person_detail,
+    get_boss_project_detail,
+    get_logical_project_detail,
     get_person_project_series,
     get_project_detail,
     get_project_group_detail,
     get_sheet_detail,
+    list_boss_people,
+    list_boss_project_cards,
     list_audit_logs,
+    list_logical_projects_for_detail,
     list_project_groups,
+    parse_batch_project_name,
+    save_project_poc_score,
     save_run_snapshot,
 )
 from panel_metrics import compute_effective_person_overall, compute_effective_project_metrics
@@ -245,6 +253,91 @@ class PanelMetricsAndDBTests(unittest.TestCase):
             self.assertEqual(detail["sheet_count"], 2)
             overall = next(x for x in detail["project_metrics"] if x["metric_group"] == "整体")
             self.assertAlmostEqual(overall["accuracy"], (8 + 12) / (10 + 20), places=6)
+            self.assertEqual(groups[0]["batch_project_name"], "项目G1")
+            self.assertEqual(groups[0]["logical_project_name"], "项目G1")
+            self.assertIsNone(groups[0]["batch_no"])
+
+    def test_parse_batch_project_name(self):
+        parsed = parse_batch_project_name("Dola-027-多语种投放VLM/LLM 001")
+        self.assertEqual(parsed["batch_project_name"], "Dola-027-多语种投放VLM/LLM 001")
+        self.assertEqual(parsed["logical_project_name"], "Dola-027-多语种投放VLM/LLM")
+        self.assertEqual(parsed["batch_no"], "001")
+
+        parsed2 = parse_batch_project_name("Dola-021-RmTestSetDevelopment")
+        self.assertEqual(parsed2["logical_project_name"], "Dola-021-RmTestSetDevelopment")
+        self.assertIsNone(parsed2["batch_no"])
+
+    def test_logical_project_detail_aggregates_batches(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db_path = f"{tmp}/panel.db"
+            g1 = "tok_001"
+            g2 = "tok_002"
+            base_name = "Dola-027-多语种投放VLM/LLM"
+
+            save_run_snapshot(
+                self._make_snapshot(
+                    project_id=f"{g1}:s1",
+                    group_id=g1,
+                    group_name=f"{base_name} 001",
+                    sheet_ref="s1",
+                    sheet_title="A",
+                    run_id="run1",
+                    run_at="2026-03-03T00:00:00+00:00",
+                    person_rows=[
+                        {
+                            "project_id": f"{g1}:s1",
+                            "person_name": "张三",
+                            "role": "初标",
+                            "volume": 10,
+                            "inspected_count": 10,
+                            "pass_count": 8,
+                            "accuracy": 0.8,
+                            "weighted_accuracy": 0.8,
+                            "difficulty_coef": 1.0,
+                        }
+                    ],
+                ),
+                db_path=db_path,
+            )
+
+            save_run_snapshot(
+                self._make_snapshot(
+                    project_id=f"{g2}:s1",
+                    group_id=g2,
+                    group_name=f"{base_name} 002",
+                    sheet_ref="s1",
+                    sheet_title="B",
+                    run_id="run2",
+                    run_at="2026-03-04T00:00:00+00:00",
+                    person_rows=[
+                        {
+                            "project_id": f"{g2}:s1",
+                            "person_name": "李四",
+                            "role": "初标",
+                            "volume": 30,
+                            "inspected_count": 30,
+                            "pass_count": 18,
+                            "accuracy": 0.6,
+                            "weighted_accuracy": 0.6,
+                            "difficulty_coef": 1.0,
+                        }
+                    ],
+                ),
+                db_path=db_path,
+            )
+
+            logical_rows = list_logical_projects_for_detail(db_path=db_path)
+            hit = next(x for x in logical_rows if x["logical_project_name"] == base_name)
+            self.assertEqual(hit["batch_count"], 2)
+            self.assertEqual(hit["sheet_count"], 2)
+
+            detail = get_logical_project_detail(db_path=db_path, logical_project_name=base_name)
+            self.assertEqual(detail["batch_count"], 2)
+            self.assertEqual(detail["sheet_count"], 2)
+            overall = next(x for x in detail["project_metrics"] if x["metric_group"] == "整体")
+            self.assertAlmostEqual(overall["accuracy"], (8 + 18) / (10 + 30), places=6)
+            batch_nos = [str(x.get("batch_no") or "") for x in detail["batches"]]
+            self.assertEqual(batch_nos, ["001", "002"])
 
     def test_person_series_supports_project_and_sheet_granularity(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -385,6 +478,186 @@ class PanelMetricsAndDBTests(unittest.TestCase):
 
             self.assertAlmostEqual(r1["accuracy"], 1.0, places=6)
             self.assertAlmostEqual(r2["accuracy"], 0.5, places=6)
+
+    def test_boss_project_cards_and_detail_include_poc_and_people(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db_path = f"{tmp}/panel.db"
+            gid = "boss_g1"
+
+            save_run_snapshot(
+                self._make_snapshot(
+                    project_id=f"{gid}:s1",
+                    group_id=gid,
+                    group_name="项目Boss 001",
+                    sheet_ref="s1",
+                    sheet_title="S1",
+                    run_id="run1",
+                    run_at="2026-03-03T00:00:00+00:00",
+                    person_rows=[
+                        {
+                            "project_id": f"{gid}:s1",
+                            "person_name": "张三",
+                            "role": "初标",
+                            "volume": 20,
+                            "inspected_count": 10,
+                            "pass_count": 8,
+                            "accuracy": 0.8,
+                            "weighted_accuracy": 0.8,
+                            "difficulty_coef": 1.0,
+                        },
+                        {
+                            "project_id": f"{gid}:s1",
+                            "person_name": "李四",
+                            "role": "质检",
+                            "volume": 10,
+                            "inspected_count": 10,
+                            "pass_count": 9,
+                            "accuracy": 0.9,
+                            "weighted_accuracy": 0.9,
+                            "difficulty_coef": 1.0,
+                        },
+                    ],
+                ),
+                db_path=db_path,
+            )
+            save_run_snapshot(
+                self._make_snapshot(
+                    project_id=f"{gid}:s2",
+                    group_id=gid,
+                    group_name="项目Boss 001",
+                    sheet_ref="s2",
+                    sheet_title="S2",
+                    run_id="run2",
+                    run_at="2026-03-04T00:00:00+00:00",
+                    person_rows=[
+                        {
+                            "project_id": f"{gid}:s2",
+                            "person_name": "张三",
+                            "role": "初标",
+                            "volume": 30,
+                            "inspected_count": 20,
+                            "pass_count": 15,
+                            "accuracy": 0.75,
+                            "weighted_accuracy": 0.75,
+                            "difficulty_coef": 1.0,
+                        }
+                    ],
+                ),
+                db_path=db_path,
+            )
+            save_project_poc_score(
+                db_path=db_path,
+                job_id="job-1",
+                project_group_id=gid,
+                project_owner="负责人A",
+                sop_score=80,
+                sheet_score=70,
+                total_score=75,
+                grade="B",
+                sop_source_type="seed",
+                model_name="seed",
+                prompt_version="v1",
+            )
+
+            cards = list_boss_project_cards(db_path=db_path)
+            self.assertEqual(len(cards), 1)
+            self.assertEqual(cards[0]["project_name"], "项目Boss")
+            self.assertEqual(cards[0]["batch_no"], "001")
+            self.assertEqual(cards[0]["poc_name"], "负责人A")
+            self.assertAlmostEqual(cards[0]["total_volume"], 60.0, places=6)
+
+            detail = get_boss_project_detail(db_path=db_path, project_group_id=gid)
+            self.assertEqual(detail["poc_name"], "负责人A")
+            self.assertEqual(detail["project_name"], "项目Boss")
+            self.assertEqual(detail["batch_no"], "001")
+            self.assertEqual(len(detail["people"]), 2)
+            self.assertEqual(detail["people"][0]["person_name"], "张三")
+            self.assertAlmostEqual(detail["people"][0]["volume_total"], 50.0, places=6)
+            self.assertAlmostEqual(detail["people"][0]["pass_total"], 23.0, places=6)
+            self.assertAlmostEqual(detail["people"][0]["inspected_total"], 30.0, places=6)
+
+    def test_boss_people_and_person_detail_aggregate_cross_project(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db_path = f"{tmp}/panel.db"
+
+            save_run_snapshot(
+                self._make_snapshot(
+                    project_id="g1:s1",
+                    group_id="g1",
+                    group_name="项目一",
+                    sheet_ref="s1",
+                    sheet_title="S1",
+                    run_id="run1",
+                    run_at="2026-03-03T00:00:00+00:00",
+                    person_rows=[
+                        {
+                            "project_id": "g1:s1",
+                            "person_name": "张三",
+                            "role": "初标",
+                            "volume": 20,
+                            "inspected_count": 10,
+                            "pass_count": 9,
+                            "accuracy": 0.9,
+                            "weighted_accuracy": 0.9,
+                            "difficulty_coef": 1.0,
+                        }
+                    ],
+                ),
+                db_path=db_path,
+            )
+            save_run_snapshot(
+                self._make_snapshot(
+                    project_id="g2:s1",
+                    group_id="g2",
+                    group_name="项目二",
+                    sheet_ref="s1",
+                    sheet_title="S1",
+                    run_id="run2",
+                    run_at="2026-03-04T00:00:00+00:00",
+                    person_rows=[
+                        {
+                            "project_id": "g2:s1",
+                            "person_name": "张三",
+                            "role": "质检",
+                            "volume": 15,
+                            "inspected_count": 10,
+                            "pass_count": 8,
+                            "accuracy": 0.8,
+                            "weighted_accuracy": 0.8,
+                            "difficulty_coef": 1.0,
+                        },
+                        {
+                            "project_id": "g2:s1",
+                            "person_name": "李四",
+                            "role": "初标",
+                            "volume": 10,
+                            "inspected_count": 5,
+                            "pass_count": 4,
+                            "accuracy": 0.8,
+                            "weighted_accuracy": 0.8,
+                            "difficulty_coef": 1.0,
+                        },
+                    ],
+                ),
+                db_path=db_path,
+            )
+
+            people = list_boss_people(db_path=db_path)
+            zhang = next(x for x in people if x["person_name"] == "张三")
+            self.assertEqual(zhang["roles"], "初标 / 质检")
+            self.assertEqual(zhang["project_count"], 2)
+            self.assertAlmostEqual(zhang["volume_total"], 35.0, places=6)
+            self.assertAlmostEqual(zhang["pass_total"], 17.0, places=6)
+            self.assertAlmostEqual(zhang["inspected_total"], 20.0, places=6)
+
+            detail = get_boss_person_detail(db_path=db_path, person_name="张三")
+            self.assertEqual(detail["person_name"], "张三")
+            self.assertEqual(detail["roles"], "初标 / 质检")
+            self.assertEqual(detail["project_count"], 2)
+            self.assertAlmostEqual(detail["volume_total"], 35.0, places=6)
+            self.assertEqual(len(detail["projects"]), 2)
+            self.assertEqual(detail["projects"][0]["project_name"], "项目一")
+            self.assertEqual(detail["projects"][1]["project_name"], "项目二")
 
 
 if __name__ == "__main__":
