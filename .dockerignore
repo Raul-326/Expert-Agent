@@ -1,10 +1,11 @@
+.git
+.gitignore
 .DS_Store
-*.swp
-*.swo
-.pycache/
-__pycache__/
+.boss_panel_app.py.swp
+.pycache
+__pycache__
 *.pyc
-.venv/
+.venv
 metrics_panel.db
 metrics_panel.db-shm
 metrics_panel.db-wal
@@ -15,3 +16,6 @@ name_roster.txt
 tokens.json
 *.log
 result.xlsx
+tests
+edgeone_redirect
+PRD_Expert_Agent_Panel.md
