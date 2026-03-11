@@ -1,0 +1,118 @@
+﻿person_name,role,project_group_id,project_group_name,project_id,sheet_ref,sheet_title,display_name,run_at,volume,inspected_count,pass_count,accuracy,weighted_accuracy,difficulty_coef
+Afreiza Firdaus_TMX,初标,Un22sCkNKhh5estOMQHcYn92nad,DL-064-小语种codeswitch case分析,Un22sCkNKhh5estOMQHcYn92nad:oh5mFS,oh5mFS,LLM- ID,DL-064-小语种codeswitch case分析,2026-03-04T18:24:21+00:00,19.0,19.0,12.0,0.631578947368421,0.631578947368421,1.0
+An An_Appen,初标,RHgGslDnxhCZcDtL1gqcG0oTnce,DL-052-新开国case review分析 001,RHgGslDnxhCZcDtL1gqcG0oTnce:dfXNVf,dfXNVf,总表,DL-052-新开国case review分析 001,2026-03-04T13:30:25+00:00,10.0,0.0,0.0,,,1.23
+Angelica Isabel Castillo Barillas_TMX,初标,ZTrjs5mDOhjV4SthwaJcWAJNnqh,Dola-022-意图识别/意图树,ZTrjs5mDOhjV4SthwaJcWAJNnqh:b375ce,b375ce,b375ce,R2x wiki b375ce,2026-03-03T07:37:30+00:00,80.0,80.0,65.0,0.8125,0.8125,1.0
+Atha Abiyyu Akram_TMX,初标,Zi5ts0PmUh7979t10JnlxXrrgGe,Dola-017-联网意图 002,Zi5ts0PmUh7979t10JnlxXrrgGe:1FpKNW,1FpKNW,ID-1,Dola-017-联网意图 002,2026-03-04T03:47:02+00:00,36.0,36.0,22.0,0.6111111111111112,0.6722222222222223,1.1
+Atif ullah_TMX,初标,Gr9Wssil4hMAahtECaKc2FX5nbh,Dola-027-多语种投放VLM/LLM 001,Gr9Wssil4hMAahtECaKc2FX5nbh:MJGpZY,MJGpZY,阿拉伯语LLM,阿拉伯语LLM,2026-03-04T02:50:19+00:00,71.0,71.0,44.0,0.6197183098591549,0.6197183098591549,1.0
+Audria M. Wiranti_TMX,初标,ByKFsTfWhhnOZOty9Azl6RmJgGc,Dola-040-实验badcase分析 002,ByKFsTfWhhnOZOty9Azl6RmJgGc:eF8d1w,eF8d1w,ID-0202-质检,Dola-040-实验badcase分析 002,2026-03-04T10:34:26+00:00,23.0,0.0,0.0,,,1.0
+Bihar Jafarian_TMX,初标,ByKFsTfWhhnOZOty9Azl6RmJgGc,Dola-040-实验badcase分析 002,ByKFsTfWhhnOZOty9Azl6RmJgGc:eF8d1w,eF8d1w,ID-0202-质检,Dola-040-实验badcase分析 002,2026-03-04T10:34:26+00:00,20.0,0.0,0.0,,,1.0
+Chayawan Thumveerapong_TMX,初标,Gr9Wssil4hMAahtECaKc2FX5nbh,Dola-027-多语种投放VLM/LLM 001,Gr9Wssil4hMAahtECaKc2FX5nbh:IJybod,IJybod,泰语LLM,泰语LLM,2026-03-04T02:50:16+00:00,65.0,65.0,38.0,0.5846153846153846,0.5846153846153846,1.0
+Eman Abutaleb,初标,Gr9Wssil4hMAahtECaKc2FX5nbh,Dola-027-多语种投放VLM/LLM 001,Gr9Wssil4hMAahtECaKc2FX5nbh:MJGpZY,MJGpZY,阿拉伯语LLM,阿拉伯语LLM,2026-03-04T02:50:19+00:00,71.0,71.0,15.0,0.2112676056338028,0.2112676056338028,1.0
+Eric Isay Espinosa Mendoza_TMX,初标,ZTrjs5mDOhjV4SthwaJcWAJNnqh,Dola-022-意图识别/意图树,ZTrjs5mDOhjV4SthwaJcWAJNnqh:b375ce,b375ce,b375ce,R2x wiki b375ce,2026-03-03T07:37:30+00:00,90.0,90.0,84.0,0.9333333333333333,0.9333333333333333,1.0
+Eric Isay Espinosa Mendoza_TMX,初标,ByKFsTfWhhnOZOty9Azl6RmJgGc,Dola-040-实验badcase分析 002,ByKFsTfWhhnOZOty9Azl6RmJgGc:48SBZ7,48SBZ7,ES-0202-质检,Dola-040-实验badcase分析 002,2026-03-04T10:35:04+00:00,42.0,0.0,0.0,,,1.0
+Fahita Farah Nesyia_TMX,初标,Zi5ts0PmUh7979t10JnlxXrrgGe,Dola-017-联网意图 002,Zi5ts0PmUh7979t10JnlxXrrgGe:1FpKNW,1FpKNW,ID-1,Dola-017-联网意图 002,2026-03-04T03:47:02+00:00,36.0,36.0,25.0,0.6944444444444444,0.763888888888889,1.1
+Fitri Sari_TMX,初标,ByKFsTfWhhnOZOty9Azl6RmJgGc,Dola-040-实验badcase分析 002,ByKFsTfWhhnOZOty9Azl6RmJgGc:eF8d1w,eF8d1w,ID-0202-质检,Dola-040-实验badcase分析 002,2026-03-04T10:34:26+00:00,20.0,0.0,0.0,,,1.0
+Fitri Sari_TMX,初标,Un22sCkNKhh5estOMQHcYn92nad,DL-064-小语种codeswitch case分析,Un22sCkNKhh5estOMQHcYn92nad:oh5mFS,oh5mFS,LLM- ID,DL-064-小语种codeswitch case分析,2026-03-04T18:24:21+00:00,20.0,20.0,18.0,0.9,0.9,1.0
+Geovani Budisari_TMX,初标,Un22sCkNKhh5estOMQHcYn92nad,DL-064-小语种codeswitch case分析,Un22sCkNKhh5estOMQHcYn92nad:bFolW0,bFolW0,VLM-ID,DL-064-小语种codeswitch case分析,2026-03-04T18:26:34+00:00,21.0,10.0,6.0,0.6,0.6,1.0
+Germaine,初标,NolzslxmhhdX5wtxbCZcOt3jnQc,Dola-026-RL6.4&RL6.2实验数据评估,NolzslxmhhdX5wtxbCZcOt3jnQc:dLSjzL,dLSjzL,dLSjzL,项目二,2026-03-02T19:07:11+00:00,28.0,0.0,0.0,,,1.2
+Ghea Regita Budi Antari_TMX,初标,Zi5ts0PmUh7979t10JnlxXrrgGe,Dola-017-联网意图 002,Zi5ts0PmUh7979t10JnlxXrrgGe:1FpKNW,1FpKNW,ID-1,Dola-017-联网意图 002,2026-03-04T03:47:02+00:00,40.0,40.0,38.0,0.95,1.045,1.1
+Inez,初标,NolzslxmhhdX5wtxbCZcOt3jnQc,Dola-026-RL6.4&RL6.2实验数据评估,NolzslxmhhdX5wtxbCZcOt3jnQc:dLSjzL,dLSjzL,dLSjzL,项目二,2026-03-02T19:07:11+00:00,24.0,0.0,0.0,,,1.2
+Inez,初标,CCIKsgMIFhQtJvtExChltCtqgch,Dola-020-RL敏捷评估,CCIKsgMIFhQtJvtExChltCtqgch:747b55,747b55,747b55,Dola-020-RL敏捷评估,2026-03-04T11:29:19+00:00,79.0,0.0,0.0,,,1.0
+Inez,质检,NolzslxmhhdX5wtxbCZcOt3jnQc,Dola-026-RL6.4&RL6.2实验数据评估,NolzslxmhhdX5wtxbCZcOt3jnQc:dLSjzL,dLSjzL,dLSjzL,项目二,2026-03-02T19:07:11+00:00,2.0,0.0,0.0,,,1.2
+Inez,质检,CCIKsgMIFhQtJvtExChltCtqgch,Dola-020-RL敏捷评估,CCIKsgMIFhQtJvtExChltCtqgch:747b55,747b55,747b55,Dola-020-RL敏捷评估,2026-03-04T11:29:19+00:00,12.0,0.0,0.0,,,1.0
+Jie,初标,NolzslxmhhdX5wtxbCZcOt3jnQc,Dola-026-RL6.4&RL6.2实验数据评估,NolzslxmhhdX5wtxbCZcOt3jnQc:dLSjzL,dLSjzL,dLSjzL,项目二,2026-03-02T19:07:11+00:00,5.0,0.0,0.0,,,1.2
+Jie,质检,NolzslxmhhdX5wtxbCZcOt3jnQc,Dola-026-RL6.4&RL6.2实验数据评估,NolzslxmhhdX5wtxbCZcOt3jnQc:dLSjzL,dLSjzL,dLSjzL,项目二,2026-03-02T19:07:11+00:00,16.0,0.0,0.0,,,1.2
+Jihye Kim_Appen,初标,RHgGslDnxhCZcDtL1gqcG0oTnce,DL-052-新开国case review分析 001,RHgGslDnxhCZcDtL1gqcG0oTnce:dfXNVf,dfXNVf,总表,DL-052-新开国case review分析 001,2026-03-04T13:30:25+00:00,10.0,0.0,0.0,,,1.23
+Juan Arnold_TMX,初标,Zi5ts0PmUh7979t10JnlxXrrgGe,Dola-017-联网意图 002,Zi5ts0PmUh7979t10JnlxXrrgGe:1FpKNW,1FpKNW,ID-1,Dola-017-联网意图 002,2026-03-04T03:47:02+00:00,59.0,59.0,40.0,0.6779661016949152,0.7457627118644068,1.1
+Juan Eduardo Perea Moreno_TMX,初标,ZTrjs5mDOhjV4SthwaJcWAJNnqh,Dola-022-意图识别/意图树,ZTrjs5mDOhjV4SthwaJcWAJNnqh:b375ce,b375ce,b375ce,R2x wiki b375ce,2026-03-03T07:37:30+00:00,40.0,40.0,22.0,0.55,0.55,1.0
+Jungha Lee_Appen,初标,RHgGslDnxhCZcDtL1gqcG0oTnce,DL-052-新开国case review分析 001,RHgGslDnxhCZcDtL1gqcG0oTnce:dfXNVf,dfXNVf,总表,DL-052-新开国case review分析 001,2026-03-04T13:30:25+00:00,10.0,0.0,0.0,,,1.23
+Ksenia Filatova_TMX,初标,ZTrjs5mDOhjV4SthwaJcWAJNnqh,Dola-022-意图识别/意图树,ZTrjs5mDOhjV4SthwaJcWAJNnqh:b375ce,b375ce,b375ce,R2x wiki b375ce,2026-03-03T07:37:30+00:00,80.0,80.0,58.0,0.725,0.725,1.0
+Luc Bui Thao Nhi_Appen,初标,RHgGslDnxhCZcDtL1gqcG0oTnce,DL-052-新开国case review分析 001,RHgGslDnxhCZcDtL1gqcG0oTnce:dfXNVf,dfXNVf,总表,DL-052-新开国case review分析 001,2026-03-04T13:30:25+00:00,9.0,0.0,0.0,,,1.23
+M. Rafli Rikin_TMX,初标,Zi5ts0PmUh7979t10JnlxXrrgGe,Dola-017-联网意图 002,Zi5ts0PmUh7979t10JnlxXrrgGe:1FpKNW,1FpKNW,ID-1,Dola-017-联网意图 002,2026-03-04T03:47:02+00:00,61.0,61.0,47.0,0.7704918032786885,0.8475409836065574,1.1
+Maryam khaled Gomaa_TMX,初标,GQDmsw59shbxQbtQKB1cvNyGnYc,Dola-031-多语种case review 001,GQDmsw59shbxQbtQKB1cvNyGnYc:8b5SYK,8b5SYK,Writing,Dola-031-多语种case review 001,2026-03-04T09:01:34+00:00,15.0,0.0,0.0,,,1.23
+Melissa Lydia_TMX,初标,Un22sCkNKhh5estOMQHcYn92nad,DL-064-小语种codeswitch case分析,Un22sCkNKhh5estOMQHcYn92nad:oh5mFS,oh5mFS,LLM- ID,DL-064-小语种codeswitch case分析,2026-03-04T18:24:21+00:00,20.0,20.0,13.0,0.65,0.65,1.0
+Noah Kityawong_TMX,初标,TI4bsLCNth1BLYtKPkslJ3QDgff,DL-048-新开国生图生视频,TI4bsLCNth1BLYtKPkslJ3QDgff:LJOCOq,LJOCOq,Worksheet 1-Image,DL-048-新开国生图生视频,2026-03-04T17:51:14+00:00,19.0,15.0,11.0,0.7333333333333333,0.7333333333333333,1.0
+Noah Kityawong_TMX,初标,TI4bsLCNth1BLYtKPkslJ3QDgff,DL-048-新开国生图生视频,TI4bsLCNth1BLYtKPkslJ3QDgff:njTalS,njTalS,Worksheet 2-Video,DL-048-新开国生图生视频,2026-03-04T17:53:42+00:00,12.0,12.0,9.0,0.75,0.75,1.0
+Paola Nathaly Ledesma Díaz_TMX,初标,ByKFsTfWhhnOZOty9Azl6RmJgGc,Dola-040-实验badcase分析 002,ByKFsTfWhhnOZOty9Azl6RmJgGc:48SBZ7,48SBZ7,ES-0202-质检,Dola-040-实验badcase分析 002,2026-03-04T10:35:04+00:00,39.0,0.0,0.0,,,1.0
+Pasiree Tarasub_TMX,初标,Gr9Wssil4hMAahtECaKc2FX5nbh,Dola-027-多语种投放VLM/LLM 001,Gr9Wssil4hMAahtECaKc2FX5nbh:IJybod,IJybod,泰语LLM,泰语LLM,2026-03-04T02:50:16+00:00,60.0,60.0,31.0,0.5166666666666667,0.5166666666666667,1.0
+Patrick,初标,NolzslxmhhdX5wtxbCZcOt3jnQc,Dola-026-RL6.4&RL6.2实验数据评估,NolzslxmhhdX5wtxbCZcOt3jnQc:dLSjzL,dLSjzL,dLSjzL,项目二,2026-03-02T19:07:11+00:00,35.0,0.0,0.0,,,1.2
+Patrick,质检,NolzslxmhhdX5wtxbCZcOt3jnQc,Dola-026-RL6.4&RL6.2实验数据评估,NolzslxmhhdX5wtxbCZcOt3jnQc:dLSjzL,dLSjzL,dLSjzL,项目二,2026-03-02T19:07:11+00:00,12.0,0.0,0.0,,,1.2
+Pattaraporn Boonkong_TMX,初标,Gr9Wssil4hMAahtECaKc2FX5nbh,Dola-027-多语种投放VLM/LLM 001,Gr9Wssil4hMAahtECaKc2FX5nbh:IJybod,IJybod,泰语LLM,泰语LLM,2026-03-04T02:50:16+00:00,25.0,25.0,7.0,0.28,0.28,1.0
+Pranitha,初标,NolzslxmhhdX5wtxbCZcOt3jnQc,Dola-026-RL6.4&RL6.2实验数据评估,NolzslxmhhdX5wtxbCZcOt3jnQc:dLSjzL,dLSjzL,dLSjzL,项目二,2026-03-02T19:07:11+00:00,28.0,0.0,0.0,,,1.2
+Pranitha,质检,NolzslxmhhdX5wtxbCZcOt3jnQc,Dola-026-RL6.4&RL6.2实验数据评估,NolzslxmhhdX5wtxbCZcOt3jnQc:dLSjzL,dLSjzL,dLSjzL,项目二,2026-03-02T19:07:11+00:00,3.0,3.0,0.0,0.0,0.0,1.2
+Raudika Lestari_TMX,初标,Un22sCkNKhh5estOMQHcYn92nad,DL-064-小语种codeswitch case分析,Un22sCkNKhh5estOMQHcYn92nad:oh5mFS,oh5mFS,LLM- ID,DL-064-小语种codeswitch case分析,2026-03-04T18:24:21+00:00,20.0,20.0,15.0,0.75,0.75,1.0
+Rodrigo de Ávila Gómez_TMX,初标,ZTrjs5mDOhjV4SthwaJcWAJNnqh,Dola-022-意图识别/意图树,ZTrjs5mDOhjV4SthwaJcWAJNnqh:b375ce,b375ce,b375ce,R2x wiki b375ce,2026-03-03T07:37:30+00:00,110.0,110.0,87.0,0.7909090909090909,0.7909090909090909,1.0
+Salma Reda Mostafa Sultan_TMX,初标,Gr9Wssil4hMAahtECaKc2FX5nbh,Dola-027-多语种投放VLM/LLM 001,Gr9Wssil4hMAahtECaKc2FX5nbh:MJGpZY,MJGpZY,阿拉伯语LLM,阿拉伯语LLM,2026-03-04T02:50:19+00:00,70.0,70.0,27.0,0.38571428571428573,0.38571428571428573,1.0
+Salma Reda Mostafa Sultan_TMX,初标,GQDmsw59shbxQbtQKB1cvNyGnYc,Dola-031-多语种case review 001,GQDmsw59shbxQbtQKB1cvNyGnYc:8b5SYK,8b5SYK,Writing,Dola-031-多语种case review 001,2026-03-04T09:01:34+00:00,15.0,0.0,0.0,,,1.23
+Sendi Puspita Sari_TMX,初标,Zi5ts0PmUh7979t10JnlxXrrgGe,Dola-017-联网意图 002,Zi5ts0PmUh7979t10JnlxXrrgGe:1FpKNW,1FpKNW,ID-1,Dola-017-联网意图 002,2026-03-04T03:47:02+00:00,37.0,37.0,30.0,0.8108108108108109,0.891891891891892,1.1
+Sendi Puspita Sari_TMX,初标,ByKFsTfWhhnOZOty9Azl6RmJgGc,Dola-040-实验badcase分析 002,ByKFsTfWhhnOZOty9Azl6RmJgGc:eF8d1w,eF8d1w,ID-0202-质检,Dola-040-实验badcase分析 002,2026-03-04T10:34:26+00:00,20.0,0.0,0.0,,,1.0
+Sendi Puspita Sari_TMX,初标,Un22sCkNKhh5estOMQHcYn92nad,DL-064-小语种codeswitch case分析,Un22sCkNKhh5estOMQHcYn92nad:bFolW0,bFolW0,VLM-ID,DL-064-小语种codeswitch case分析,2026-03-04T18:26:34+00:00,20.0,20.0,14.0,0.7,0.7,1.0
+Siti Dewi Rahayu_TMX,初标,Zi5ts0PmUh7979t10JnlxXrrgGe,Dola-017-联网意图 002,Zi5ts0PmUh7979t10JnlxXrrgGe:1FpKNW,1FpKNW,ID-1,Dola-017-联网意图 002,2026-03-04T03:47:02+00:00,37.0,37.0,23.0,0.6216216216216216,0.6837837837837838,1.1
+Takuma,初标,RHgGslDnxhCZcDtL1gqcG0oTnce,DL-052-新开国case review分析 001,RHgGslDnxhCZcDtL1gqcG0oTnce:dfXNVf,dfXNVf,总表,DL-052-新开国case review分析 001,2026-03-04T13:30:25+00:00,5.0,0.0,0.0,,,1.23
+Tara Devina Putri_TMX,初标,Zi5ts0PmUh7979t10JnlxXrrgGe,Dola-017-联网意图 002,Zi5ts0PmUh7979t10JnlxXrrgGe:1FpKNW,1FpKNW,ID-1,Dola-017-联网意图 002,2026-03-04T03:47:02+00:00,37.0,37.0,33.0,0.8918918918918919,0.9810810810810812,1.1
+Trần Hoàng_Appen,初标,RHgGslDnxhCZcDtL1gqcG0oTnce,DL-052-新开国case review分析 001,RHgGslDnxhCZcDtL1gqcG0oTnce:dfXNVf,dfXNVf,总表,DL-052-新开国case review分析 001,2026-03-04T13:30:25+00:00,10.0,0.0,0.0,,,1.23
+Viency,初标,NolzslxmhhdX5wtxbCZcOt3jnQc,Dola-026-RL6.4&RL6.2实验数据评估,NolzslxmhhdX5wtxbCZcOt3jnQc:dLSjzL,dLSjzL,dLSjzL,项目二,2026-03-02T19:07:11+00:00,35.0,0.0,0.0,,,1.2
+Viency,质检,NolzslxmhhdX5wtxbCZcOt3jnQc,Dola-026-RL6.4&RL6.2实验数据评估,NolzslxmhhdX5wtxbCZcOt3jnQc:dLSjzL,dLSjzL,dLSjzL,项目二,2026-03-02T19:07:11+00:00,4.0,0.0,0.0,,,1.2
+Warren,初标,NolzslxmhhdX5wtxbCZcOt3jnQc,Dola-026-RL6.4&RL6.2实验数据评估,NolzslxmhhdX5wtxbCZcOt3jnQc:dLSjzL,dLSjzL,dLSjzL,项目二,2026-03-02T19:07:11+00:00,13.0,0.0,0.0,,,1.2
+Wassana Ruankaew_TMX,初标,Gr9Wssil4hMAahtECaKc2FX5nbh,Dola-027-多语种投放VLM/LLM 001,Gr9Wssil4hMAahtECaKc2FX5nbh:IJybod,IJybod,泰语LLM,泰语LLM,2026-03-04T02:50:16+00:00,50.0,50.0,34.0,0.68,0.68,1.0
+Weghanasa Cendana_TMX,初标,Zi5ts0PmUh7979t10JnlxXrrgGe,Dola-017-联网意图 002,Zi5ts0PmUh7979t10JnlxXrrgGe:1FpKNW,1FpKNW,ID-1,Dola-017-联网意图 002,2026-03-04T03:47:02+00:00,57.0,57.0,32.0,0.5614035087719298,0.6175438596491228,1.1
+Xiaoxia,初标,NolzslxmhhdX5wtxbCZcOt3jnQc,Dola-026-RL6.4&RL6.2实验数据评估,NolzslxmhhdX5wtxbCZcOt3jnQc:dLSjzL,dLSjzL,dLSjzL,项目二,2026-03-02T19:07:11+00:00,7.0,7.0,0.0,0.0,0.0,1.2
+Xiaoxia,初标,NolzslxmhhdX5wtxbCZcOt3jnQc,Dola-026-RL6.4&RL6.2实验数据评估,NolzslxmhhdX5wtxbCZcOt3jnQc:7e1774,7e1774,7e1774,项目一,2026-03-02T19:07:28+00:00,16.0,16.0,8.0,0.5,0.5,1.0
+Xiaoxia,初标,XJYxsa8HghBTNqtRBKslYQRjgfe,Dola-025-实验分析 001,XJYxsa8HghBTNqtRBKslYQRjgfe:1DUumU,1DUumU,LLM-联网+非联网汇总（包含闲聊）,Dola-025-实验分析 001,2026-03-04T08:36:45+00:00,22.0,0.0,0.0,,,1.0
+Xiaoxia,初标,VJ6Gs7mihhs6eWtwzIglPOvVgug,DL-029-联网badcase 拆解,VJ6Gs7mihhs6eWtwzIglPOvVgug:48f8ea,48f8ea,EN Bad Case 联网bad case,DL-029-联网badcase 拆解,2026-03-04T08:51:08+00:00,16.0,16.0,8.0,0.5,0.5,1.0
+Xiaoxia,初标,CCIKsgMIFhQtJvtExChltCtqgch,Dola-020-RL敏捷评估,CCIKsgMIFhQtJvtExChltCtqgch:747b55,747b55,747b55,Dola-020-RL敏捷评估,2026-03-04T11:29:19+00:00,32.0,2.0,0.0,0.0,0.0,1.0
+Yiming,初标,CCIKsgMIFhQtJvtExChltCtqgch,Dola-020-RL敏捷评估,CCIKsgMIFhQtJvtExChltCtqgch:747b55,747b55,747b55,Dola-020-RL敏捷评估,2026-03-04T11:29:19+00:00,2.0,0.0,0.0,,,1.0
+Yiming,质检,CCIKsgMIFhQtJvtExChltCtqgch,Dola-020-RL敏捷评估,CCIKsgMIFhQtJvtExChltCtqgch:747b55,747b55,747b55,Dola-020-RL敏捷评估,2026-03-04T11:29:19+00:00,15.0,0.0,0.0,,,1.0
+Yu Sun Kang_Appen,初标,RHgGslDnxhCZcDtL1gqcG0oTnce,DL-052-新开国case review分析 001,RHgGslDnxhCZcDtL1gqcG0oTnce:dfXNVf,dfXNVf,总表,DL-052-新开国case review分析 001,2026-03-04T13:30:25+00:00,9.0,0.0,0.0,,,1.23
+Yuki,初标,RHgGslDnxhCZcDtL1gqcG0oTnce,DL-052-新开国case review分析 001,RHgGslDnxhCZcDtL1gqcG0oTnce:dfXNVf,dfXNVf,总表,DL-052-新开国case review分析 001,2026-03-04T13:30:25+00:00,9.0,0.0,0.0,,,1.23
+Zi xuan,初标,NolzslxmhhdX5wtxbCZcOt3jnQc,Dola-026-RL6.4&RL6.2实验数据评估,NolzslxmhhdX5wtxbCZcOt3jnQc:dLSjzL,dLSjzL,dLSjzL,项目二,2026-03-02T19:07:11+00:00,3.0,0.0,0.0,,,1.2
+于润寰,初标,NolzslxmhhdX5wtxbCZcOt3jnQc,Dola-026-RL6.4&RL6.2实验数据评估,NolzslxmhhdX5wtxbCZcOt3jnQc:7e1774,7e1774,7e1774,项目一,2026-03-02T19:07:28+00:00,3.0,3.0,2.0,0.6666666666666666,0.6666666666666666,1.0
+于润寰,初标,N1nVs9hrrhU1autFje3cHwm2nmf,Dola-021-RmTestSetDevelopment,N1nVs9hrrhU1autFje3cHwm2nmf:da08c1,da08c1,Evaluation,Evaluation,2026-03-04T02:45:26+00:00,31.0,6.0,5.0,0.8333333333333334,0.8333333333333334,1.0
+于润寰,初标,VJ6Gs7mihhs6eWtwzIglPOvVgug,DL-029-联网badcase 拆解,VJ6Gs7mihhs6eWtwzIglPOvVgug:48f8ea,48f8ea,EN Bad Case 联网bad case,DL-029-联网badcase 拆解,2026-03-04T08:51:08+00:00,3.0,3.0,3.0,1.0,1.0,1.0
+于润寰,初标,CCIKsgMIFhQtJvtExChltCtqgch,Dola-020-RL敏捷评估,CCIKsgMIFhQtJvtExChltCtqgch:747b55,747b55,747b55,Dola-020-RL敏捷评估,2026-03-04T11:29:19+00:00,23.0,3.0,3.0,1.0,1.0,1.0
+于润寰,质检,N1nVs9hrrhU1autFje3cHwm2nmf,Dola-021-RmTestSetDevelopment,N1nVs9hrrhU1autFje3cHwm2nmf:da08c1,da08c1,Evaluation,Evaluation,2026-03-04T02:45:26+00:00,12.0,0.0,0.0,,,1.0
+励泽坪,初标,NolzslxmhhdX5wtxbCZcOt3jnQc,Dola-026-RL6.4&RL6.2实验数据评估,NolzslxmhhdX5wtxbCZcOt3jnQc:dLSjzL,dLSjzL,dLSjzL,项目二,2026-03-02T19:07:11+00:00,4.0,2.0,1.0,0.5,0.6,1.2
+励泽坪,初标,NolzslxmhhdX5wtxbCZcOt3jnQc,Dola-026-RL6.4&RL6.2实验数据评估,NolzslxmhhdX5wtxbCZcOt3jnQc:7e1774,7e1774,7e1774,项目一,2026-03-02T19:07:28+00:00,30.0,30.0,24.0,0.8,0.8,1.0
+励泽坪,初标,N1nVs9hrrhU1autFje3cHwm2nmf,Dola-021-RmTestSetDevelopment,N1nVs9hrrhU1autFje3cHwm2nmf:da08c1,da08c1,Evaluation,Evaluation,2026-03-04T02:45:26+00:00,100.0,28.0,14.0,0.5,0.5,1.0
+励泽坪,初标,XJYxsa8HghBTNqtRBKslYQRjgfe,Dola-025-实验分析 001,XJYxsa8HghBTNqtRBKslYQRjgfe:1DUumU,1DUumU,LLM-联网+非联网汇总（包含闲聊）,Dola-025-实验分析 001,2026-03-04T08:36:45+00:00,5.0,0.0,0.0,,,1.0
+励泽坪,初标,VJ6Gs7mihhs6eWtwzIglPOvVgug,DL-029-联网badcase 拆解,VJ6Gs7mihhs6eWtwzIglPOvVgug:48f8ea,48f8ea,EN Bad Case 联网bad case,DL-029-联网badcase 拆解,2026-03-04T08:51:08+00:00,31.0,31.0,25.0,0.8064516129032258,0.8064516129032258,1.0
+励泽坪,初标,CCIKsgMIFhQtJvtExChltCtqgch,Dola-020-RL敏捷评估,CCIKsgMIFhQtJvtExChltCtqgch:747b55,747b55,747b55,Dola-020-RL敏捷评估,2026-03-04T11:29:19+00:00,33.0,0.0,0.0,,,1.0
+励泽坪,质检,NolzslxmhhdX5wtxbCZcOt3jnQc,Dola-026-RL6.4&RL6.2实验数据评估,NolzslxmhhdX5wtxbCZcOt3jnQc:dLSjzL,dLSjzL,dLSjzL,项目二,2026-03-02T19:07:11+00:00,8.0,1.0,1.0,1.0,1.2,1.2
+励泽坪,质检,N1nVs9hrrhU1autFje3cHwm2nmf,Dola-021-RmTestSetDevelopment,N1nVs9hrrhU1autFje3cHwm2nmf:da08c1,da08c1,Evaluation,Evaluation,2026-03-04T02:45:26+00:00,106.0,0.0,0.0,,,1.0
+孟天舒,初标,XJYxsa8HghBTNqtRBKslYQRjgfe,Dola-025-实验分析 001,XJYxsa8HghBTNqtRBKslYQRjgfe:1DUumU,1DUumU,LLM-联网+非联网汇总（包含闲聊）,Dola-025-实验分析 001,2026-03-04T08:36:45+00:00,20.0,0.0,0.0,,,1.0
+孟天舒,质检,NolzslxmhhdX5wtxbCZcOt3jnQc,Dola-026-RL6.4&RL6.2实验数据评估,NolzslxmhhdX5wtxbCZcOt3jnQc:7e1774,7e1774,7e1774,项目一,2026-03-02T19:07:28+00:00,19.0,19.0,0.0,0.0,0.0,1.0
+孟天舒,质检,VJ6Gs7mihhs6eWtwzIglPOvVgug,DL-029-联网badcase 拆解,VJ6Gs7mihhs6eWtwzIglPOvVgug:48f8ea,48f8ea,EN Bad Case 联网bad case,DL-029-联网badcase 拆解,2026-03-04T08:51:08+00:00,19.0,0.0,0.0,,,1.0
+已核验,质检,NolzslxmhhdX5wtxbCZcOt3jnQc,Dola-026-RL6.4&RL6.2实验数据评估,NolzslxmhhdX5wtxbCZcOt3jnQc:7e1774,7e1774,7e1774,项目一,2026-03-02T19:07:28+00:00,39.0,39.0,38.0,0.9743589743589743,0.9743589743589743,1.0
+已核验,质检,VJ6Gs7mihhs6eWtwzIglPOvVgug,DL-029-联网badcase 拆解,VJ6Gs7mihhs6eWtwzIglPOvVgug:48f8ea,48f8ea,EN Bad Case 联网bad case,DL-029-联网badcase 拆解,2026-03-04T08:51:08+00:00,40.0,0.0,0.0,,,1.0
+张璇,初标,XJYxsa8HghBTNqtRBKslYQRjgfe,Dola-025-实验分析 001,XJYxsa8HghBTNqtRBKslYQRjgfe:1DUumU,1DUumU,LLM-联网+非联网汇总（包含闲聊）,Dola-025-实验分析 001,2026-03-04T08:36:45+00:00,2.0,0.0,0.0,,,1.0
+李洺萱,质检,NolzslxmhhdX5wtxbCZcOt3jnQc,Dola-026-RL6.4&RL6.2实验数据评估,NolzslxmhhdX5wtxbCZcOt3jnQc:7e1774,7e1774,7e1774,项目一,2026-03-02T19:07:28+00:00,17.0,17.0,2.0,0.11764705882352941,0.11764705882352941,1.0
+李洺萱,质检,VJ6Gs7mihhs6eWtwzIglPOvVgug,DL-029-联网badcase 拆解,VJ6Gs7mihhs6eWtwzIglPOvVgug:48f8ea,48f8ea,EN Bad Case 联网bad case,DL-029-联网badcase 拆解,2026-03-04T08:51:08+00:00,17.0,0.0,0.0,,,1.0
+李蔚祺,初标,N1nVs9hrrhU1autFje3cHwm2nmf,Dola-021-RmTestSetDevelopment,N1nVs9hrrhU1autFje3cHwm2nmf:da08c1,da08c1,Evaluation,Evaluation,2026-03-04T02:45:26+00:00,19.0,13.0,9.0,0.6923076923076923,0.6923076923076923,1.0
+李蔚祺,初标,XJYxsa8HghBTNqtRBKslYQRjgfe,Dola-025-实验分析 001,XJYxsa8HghBTNqtRBKslYQRjgfe:1DUumU,1DUumU,LLM-联网+非联网汇总（包含闲聊）,Dola-025-实验分析 001,2026-03-04T08:36:45+00:00,45.0,0.0,0.0,,,1.0
+李蔚祺,质检,N1nVs9hrrhU1autFje3cHwm2nmf,Dola-021-RmTestSetDevelopment,N1nVs9hrrhU1autFje3cHwm2nmf:da08c1,da08c1,Evaluation,Evaluation,2026-03-04T02:45:26+00:00,40.0,0.0,0.0,,,1.0
+杨晓霞,初标,N1nVs9hrrhU1autFje3cHwm2nmf,Dola-021-RmTestSetDevelopment,N1nVs9hrrhU1autFje3cHwm2nmf:da08c1,da08c1,Evaluation,Evaluation,2026-03-04T02:45:26+00:00,100.0,8.0,4.0,0.5,0.5,1.0
+杨晓霞,质检,N1nVs9hrrhU1autFje3cHwm2nmf,Dola-021-RmTestSetDevelopment,N1nVs9hrrhU1autFje3cHwm2nmf:da08c1,da08c1,Evaluation,Evaluation,2026-03-04T02:45:26+00:00,106.0,0.0,0.0,,,1.0
+汪珈吉,初标,XJYxsa8HghBTNqtRBKslYQRjgfe,Dola-025-实验分析 001,XJYxsa8HghBTNqtRBKslYQRjgfe:1DUumU,1DUumU,LLM-联网+非联网汇总（包含闲聊）,Dola-025-实验分析 001,2026-03-04T08:36:45+00:00,48.0,0.0,0.0,,,1.0
+汪珈吉,质检,NolzslxmhhdX5wtxbCZcOt3jnQc,Dola-026-RL6.4&RL6.2实验数据评估,NolzslxmhhdX5wtxbCZcOt3jnQc:7e1774,7e1774,7e1774,项目一,2026-03-02T19:07:28+00:00,12.0,12.0,0.0,0.0,0.0,1.0
+汪珈吉,质检,VJ6Gs7mihhs6eWtwzIglPOvVgug,DL-029-联网badcase 拆解,VJ6Gs7mihhs6eWtwzIglPOvVgug:48f8ea,48f8ea,EN Bad Case 联网bad case,DL-029-联网badcase 拆解,2026-03-04T08:51:08+00:00,12.0,0.0,0.0,,,1.0
+涂瑾芳,初标,NolzslxmhhdX5wtxbCZcOt3jnQc,Dola-026-RL6.4&RL6.2实验数据评估,NolzslxmhhdX5wtxbCZcOt3jnQc:dLSjzL,dLSjzL,dLSjzL,项目二,2026-03-02T19:07:11+00:00,20.0,20.0,10.0,0.5,0.6,1.2
+涂瑾芳,初标,NolzslxmhhdX5wtxbCZcOt3jnQc,Dola-026-RL6.4&RL6.2实验数据评估,NolzslxmhhdX5wtxbCZcOt3jnQc:7e1774,7e1774,7e1774,项目一,2026-03-02T19:07:28+00:00,22.0,22.0,8.0,0.36363636363636365,0.36363636363636365,1.0
+涂瑾芳,初标,N1nVs9hrrhU1autFje3cHwm2nmf,Dola-021-RmTestSetDevelopment,N1nVs9hrrhU1autFje3cHwm2nmf:da08c1,da08c1,Evaluation,Evaluation,2026-03-04T02:45:26+00:00,100.0,13.0,7.0,0.5384615384615384,0.5384615384615384,1.0
+涂瑾芳,初标,XJYxsa8HghBTNqtRBKslYQRjgfe,Dola-025-实验分析 001,XJYxsa8HghBTNqtRBKslYQRjgfe:1DUumU,1DUumU,LLM-联网+非联网汇总（包含闲聊）,Dola-025-实验分析 001,2026-03-04T08:36:45+00:00,20.0,0.0,0.0,,,1.0
+涂瑾芳,初标,VJ6Gs7mihhs6eWtwzIglPOvVgug,DL-029-联网badcase 拆解,VJ6Gs7mihhs6eWtwzIglPOvVgug:48f8ea,48f8ea,EN Bad Case 联网bad case,DL-029-联网badcase 拆解,2026-03-04T08:51:08+00:00,22.0,22.0,8.0,0.36363636363636365,0.36363636363636365,1.0
+涂瑾芳,初标,CCIKsgMIFhQtJvtExChltCtqgch,Dola-020-RL敏捷评估,CCIKsgMIFhQtJvtExChltCtqgch:747b55,747b55,747b55,Dola-020-RL敏捷评估,2026-03-04T11:29:19+00:00,22.0,6.0,0.0,0.0,0.0,1.0
+涂瑾芳,初标,RHgGslDnxhCZcDtL1gqcG0oTnce,DL-052-新开国case review分析 001,RHgGslDnxhCZcDtL1gqcG0oTnce:dfXNVf,dfXNVf,总表,DL-052-新开国case review分析 001,2026-03-04T13:30:25+00:00,13.0,0.0,0.0,,,1.23
+涂瑾芳,质检,N1nVs9hrrhU1autFje3cHwm2nmf,Dola-021-RmTestSetDevelopment,N1nVs9hrrhU1autFje3cHwm2nmf:da08c1,da08c1,Evaluation,Evaluation,2026-03-04T02:45:26+00:00,106.0,1.0,0.0,0.0,0.0,1.0
+王乙琀,初标,NolzslxmhhdX5wtxbCZcOt3jnQc,Dola-026-RL6.4&RL6.2实验数据评估,NolzslxmhhdX5wtxbCZcOt3jnQc:dLSjzL,dLSjzL,dLSjzL,项目二,2026-03-02T19:07:11+00:00,16.0,16.0,9.0,0.5625,0.6749999999999999,1.2
+王乙琀,初标,NolzslxmhhdX5wtxbCZcOt3jnQc,Dola-026-RL6.4&RL6.2实验数据评估,NolzslxmhhdX5wtxbCZcOt3jnQc:7e1774,7e1774,7e1774,项目一,2026-03-02T19:07:28+00:00,24.0,24.0,18.0,0.75,0.75,1.0
+王乙琀,初标,N1nVs9hrrhU1autFje3cHwm2nmf,Dola-021-RmTestSetDevelopment,N1nVs9hrrhU1autFje3cHwm2nmf:da08c1,da08c1,Evaluation,Evaluation,2026-03-04T02:45:26+00:00,100.0,7.0,4.0,0.5714285714285714,0.5714285714285714,1.0
+王乙琀,初标,XJYxsa8HghBTNqtRBKslYQRjgfe,Dola-025-实验分析 001,XJYxsa8HghBTNqtRBKslYQRjgfe:1DUumU,1DUumU,LLM-联网+非联网汇总（包含闲聊）,Dola-025-实验分析 001,2026-03-04T08:36:45+00:00,28.0,0.0,0.0,,,1.0
+王乙琀,初标,VJ6Gs7mihhs6eWtwzIglPOvVgug,DL-029-联网badcase 拆解,VJ6Gs7mihhs6eWtwzIglPOvVgug:48f8ea,48f8ea,EN Bad Case 联网bad case,DL-029-联网badcase 拆解,2026-03-04T08:51:08+00:00,24.0,24.0,18.0,0.75,0.75,1.0
+王乙琀,初标,CCIKsgMIFhQtJvtExChltCtqgch,Dola-020-RL敏捷评估,CCIKsgMIFhQtJvtExChltCtqgch:747b55,747b55,747b55,Dola-020-RL敏捷评估,2026-03-04T11:29:19+00:00,22.0,0.0,0.0,,,1.0
+王乙琀,初标,RHgGslDnxhCZcDtL1gqcG0oTnce,DL-052-新开国case review分析 001,RHgGslDnxhCZcDtL1gqcG0oTnce:dfXNVf,dfXNVf,总表,DL-052-新开国case review分析 001,2026-03-04T13:30:25+00:00,41.0,0.0,0.0,,,1.23
+王乙琀,质检,N1nVs9hrrhU1autFje3cHwm2nmf,Dola-021-RmTestSetDevelopment,N1nVs9hrrhU1autFje3cHwm2nmf:da08c1,da08c1,Evaluation,Evaluation,2026-03-04T02:45:26+00:00,106.0,0.0,0.0,,,1.0
+王依依,初标,N1nVs9hrrhU1autFje3cHwm2nmf,Dola-021-RmTestSetDevelopment,N1nVs9hrrhU1autFje3cHwm2nmf:da08c1,da08c1,Evaluation,Evaluation,2026-03-04T02:45:26+00:00,36.0,12.0,4.0,0.3333333333333333,0.3333333333333333,1.0
+王依依,质检,NolzslxmhhdX5wtxbCZcOt3jnQc,Dola-026-RL6.4&RL6.2实验数据评估,NolzslxmhhdX5wtxbCZcOt3jnQc:7e1774,7e1774,7e1774,项目一,2026-03-02T19:07:28+00:00,8.0,8.0,0.0,0.0,0.0,1.0
+王依依,质检,VJ6Gs7mihhs6eWtwzIglPOvVgug,DL-029-联网badcase 拆解,VJ6Gs7mihhs6eWtwzIglPOvVgug:48f8ea,48f8ea,EN Bad Case 联网bad case,DL-029-联网badcase 拆解,2026-03-04T08:51:08+00:00,8.0,0.0,0.0,,,1.0
+陈怿名,质检,N1nVs9hrrhU1autFje3cHwm2nmf,Dola-021-RmTestSetDevelopment,N1nVs9hrrhU1autFje3cHwm2nmf:da08c1,da08c1,Evaluation,Evaluation,2026-03-04T02:45:26+00:00,10.0,0.0,0.0,,,1.0
+韩毅,初标,XJYxsa8HghBTNqtRBKslYQRjgfe,Dola-025-实验分析 001,XJYxsa8HghBTNqtRBKslYQRjgfe:1DUumU,1DUumU,LLM-联网+非联网汇总（包含闲聊）,Dola-025-实验分析 001,2026-03-04T08:36:45+00:00,6.0,0.0,0.0,,,1.0
