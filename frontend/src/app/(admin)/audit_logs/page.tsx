@@ -1,13 +1,14 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { API_BASE_URL } from "@/lib/constants";
 
-export default function AdminAuditLogsPage() {
+export default function AuditLogsPage() {
   const [logs, setLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("http://127.0.0.1:8000/api/v1/admin/audit_logs")
+    fetch(`${API_BASE_URL}/api/v1/admin/audit_logs`)
       .then((res) => res.json())
       .then((data) => {
         if (Array.isArray(data)) setLogs(data);

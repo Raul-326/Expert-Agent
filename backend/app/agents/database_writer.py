@@ -1,5 +1,5 @@
 import pandas as pd
-from typing import Dict, Optional
+from typing import Dict, Optional, Any
 from datetime import datetime
 
 import sys
@@ -10,13 +10,15 @@ from sqlmodel import Session, select
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../")))
 
 # 引入新的 ORM
-from app.models.base import engine, ProjectGroup, Run, PersonMetrics
+from app.models.base import engine, ProjectGroup, Run, PersonMetrics, ProjectMetrics
+from app.core.personnel import personnel_manager
+from panel_metrics import safe_float, recompute_weighted_accuracy
 
 class DatabaseWriterAgent:
     def __init__(self):
         pass
 
-    def write(self, project_group_name: str, spreadsheet_token: str, poc_name: Optional[str], stats: Dict[str, pd.DataFrame]) -> int:
+    def write(self, project_group_name: str, spreadsheet_token: str, poc_name: Optional[str], stats: Dict[str, pd.DataFrame], difficulty_coef: float = 1.0) -> int:
         """
         负责拿到 Evaluator 给出的统计后，调用 ProjectGroup, Run 和 PersonMetrics 模型将数据存入数据库。
         """
@@ -57,48 +59,70 @@ class DatabaseWriterAgent:
             # 写初标人
             if not annotator_stats.empty:
                 for _, row in annotator_stats.iterrows():
+                    raw_name = str(row.get('初标人', 'Unknown'))
+                    full_name = personnel_manager.resolve_name(raw_name)
+                    if not full_name: continue
+
+                    inspected = safe_float(row.get('被质检数', 0))
+                    passed = safe_float(row.get('质检通过数', 0))
+                    acc = (passed / inspected) if (inspected and inspected > 0) else None
+                    weighted_acc = recompute_weighted_accuracy(acc, difficulty_coef)
+
                     metric = PersonMetrics(
                         run_id=new_run.id,
-                        person_name=str(row.get('初标人', 'Unknown')),
+                        person_name=full_name,
                         role="annotator",
-                        volume=int(row.get('初标总产量', 0) or 0),
-                        inspected_count=int(row.get('被抽检量', 0) or 0),
-                        pass_count=int(row.get('被抽检通过量', 0) or 0),
-                        accuracy=float(row.get('准确率_原始', 0.0)) if '准确率_原始' in row and not pd.isna(row['准确率_原始']) else None,
-                        weighted_accuracy=None,
-                        difficulty_coef=1.0
+                        volume=int(safe_float(row.get('初标总产量', 0)) or 0),
+                        inspected_count=int(inspected or 0),
+                        pass_count=int(passed or 0),
+                        accuracy=acc,
+                        weighted_accuracy=weighted_acc,
+                        difficulty_coef=difficulty_coef
                     )
                     session.add(metric)
 
             # 写质检人
             if not qa_stats.empty:
                 for _, row in qa_stats.iterrows():
+                    raw_name = str(row.get('质检人', 'Unknown'))
+                    full_name = personnel_manager.resolve_name(raw_name)
+                    if not full_name: continue
+
+                    inspected = safe_float(row.get('被抽检数', 0))
+                    passed = safe_float(row.get('抽检通过数', 0))
+                    acc = (passed / inspected) if (inspected and inspected > 0) else None
+                    weighted_acc = recompute_weighted_accuracy(acc, difficulty_coef)
+
                     metric = PersonMetrics(
                         run_id=new_run.id,
-                        person_name=str(row.get('质检人', 'Unknown')),
+                        person_name=full_name,
                         role="qa",
-                        volume=int(row.get('质检总产量', 0) or 0),
-                        inspected_count=0,
-                        pass_count=0,
-                        accuracy=None,
-                        weighted_accuracy=None,
-                        difficulty_coef=1.0
+                        volume=int(safe_float(row.get('质检总产量', 0)) or 0),
+                        inspected_count=int(inspected or 0),
+                        pass_count=int(passed or 0),
+                        accuracy=acc,
+                        weighted_accuracy=weighted_acc,
+                        difficulty_coef=difficulty_coef
                     )
                     session.add(metric)
 
             # 写 POC
             if not poc_stats.empty:
                 for _, row in poc_stats.iterrows():
+                    raw_name = str(row.get('POC 姓名', 'Unknown'))
+                    full_name = personnel_manager.resolve_name(raw_name)
+                    if not full_name: continue
+
                     metric = PersonMetrics(
                         run_id=new_run.id,
-                        person_name=str(row.get('POC 姓名', 'Unknown')),
+                        person_name=full_name,
                         role="poc",
-                        volume=int(row.get('抽检产量', 0) or 0),
+                        volume=int(safe_float(row.get('抽检产量', 0)) or 0),
                         inspected_count=0,
                         pass_count=0,
                         accuracy=None,
                         weighted_accuracy=None,
-                        difficulty_coef=1.0
+                        difficulty_coef=difficulty_coef
                     )
                     session.add(metric)
 

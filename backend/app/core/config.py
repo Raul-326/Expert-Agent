@@ -10,8 +10,12 @@ class Settings(BaseSettings):
     CELERY_RESULT_BACKEND: str = "redis://localhost:6379/0"
 
     # Database
-    SQLITE_URL: str = "sqlite:///../metrics_panel.db"
-    # POSTGRES_URL: str = "postgresql://user:password@localhost/dbname"
+    DATABASE_URL: str = "sqlite:///../metrics_panel.db"
+
+    # API Keys
+    ARK_API_KEY: str = ""
+    FEISHU_APP_ID: str = ""
+    FEISHU_APP_SECRET: str = ""
 
     class Config:
         env_file = ".env"
