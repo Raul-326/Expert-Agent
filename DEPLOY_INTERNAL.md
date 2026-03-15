@@ -9,6 +9,39 @@
 - 启动前先执行 `Alembic` 迁移
 - 不依赖 Docker
 
+## SCM 发布
+
+如果走字节内部 `SCM`，推荐这样配置：
+
+- 执行方式：`SCM 编译脚本`
+- 编译脚本相对路径：`build.sh`
+- 编译产物上传目录：`output`
+
+`build.sh` 会完成：
+
+```bash
+npm ci
+npm run build
+复制 frontend standalone 运行产物
+复制 backend/alembic/根目录依赖文件
+```
+
+发布到目标机器后，使用：
+
+```bash
+bash deploy/start_scm.sh
+```
+
+它会执行：
+
+```bash
+python3 -m venv backend/.venv
+pip install -r backend/requirements.txt
+alembic upgrade head
+uvicorn app.main:app
+node frontend/server.js
+```
+
 ## 必需环境变量
 
 ```bash
