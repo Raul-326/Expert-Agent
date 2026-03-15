@@ -4,7 +4,6 @@ import {
   BarChart3, 
   Users, 
   LogOut, 
-  Settings,
   ShieldCheck,
   LayoutDashboard
 } from "lucide-react";
@@ -60,7 +59,13 @@ export default function BossLayout({
   );
 }
 
-function SidebarLink({ href, icon, label }: any) {
+type SidebarLinkProps = {
+  href: string;
+  icon: React.ReactNode;
+  label: string;
+};
+
+function SidebarLink({ href, icon, label }: SidebarLinkProps) {
   return (
     <Link 
       href={href} 

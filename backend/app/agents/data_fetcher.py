@@ -23,7 +23,7 @@ class DataFetcherAgent:
         self.feishu_url = feishu_url
         self.user_access_token = user_access_token
 
-    def fetch(self, sheet_name: Optional[str] = None) -> List[Dict[str, Any]]:
+    def fetch(self, sheet_name: Optional[str] = None) -> Dict[str, Any]:
         """
         接收飞书 URL 和 user_access_token。
         1. 自动判定 URL 类型：如果是 docx/wiki 文档，则通过 Ark 寻找其中的表格数据源。
@@ -65,7 +65,13 @@ class DataFetcherAgent:
 
         # 4. 填充空值，转换为行数据字典列表返回
         df = df.fillna("")
-        return df.to_dict(orient="records")
+        return {
+            "rows": df.to_dict(orient="records"),
+            "spreadsheet_token": spreadsheet_token,
+            "sheet_ref": target_sheet or "",
+            "sheet_title": target_sheet or "",
+            "source_url": target_url,
+        }
 
     def _find_data_source_with_ark(self, title: str, content: str) -> Optional[dict]:
         """调用 Ark 模型分析文档内容，提取表格数据源信息"""

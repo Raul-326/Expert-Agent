@@ -23,10 +23,33 @@ import {
 } from "recharts";
 import { API_BASE_URL } from "@/lib/constants";
 
+type PersonProject = {
+  project_name: string;
+  role: string;
+  volume: number;
+  inspected: number;
+  passed: number;
+  accuracy: number | null;
+  date: string;
+};
+
+type PersonDetailData = {
+  person_name: string;
+  projects: PersonProject[];
+};
+
+type LevelColor = 'indigo' | 'amber' | 'emerald' | 'rose' | 'slate';
+
+type StatsMiniProps = {
+  label: string;
+  value: string | number;
+  color: LevelColor;
+};
+
 export default function PersonDetail({ params }: { params: Promise<{ name: string }> }) {
   const { name } = use(params);
   const personName = decodeURIComponent(name);
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<PersonDetailData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -57,13 +80,14 @@ export default function PersonDetail({ params }: { params: Promise<{ name: strin
   }
 
   // 计算人员汇总
-  const totalVolume = data.projects.reduce((acc: any, p: any) => acc + p.volume, 0);
-  const avgAccuracy = data.projects.filter((p:any) => p.accuracy).length > 0
-    ? data.projects.filter((p:any) => p.accuracy).reduce((acc: any, p: any) => acc + p.accuracy, 0) / data.projects.filter((p:any) => p.accuracy).length
+  const totalVolume = data.projects.reduce((acc, p) => acc + p.volume, 0);
+  const accuracyRows = data.projects.filter((p) => p.accuracy !== null);
+  const avgAccuracy = accuracyRows.length > 0
+    ? accuracyRows.reduce((acc, p) => acc + (p.accuracy ?? 0), 0) / accuracyRows.length
     : 0;
 
   // 准备图表数据
-  const chartData = data.projects.map((p: any) => ({
+  const chartData = data.projects.map((p) => ({
     name: p.project_name,
     accuracy: p.accuracy ? p.accuracy * 100 : null,
     volume: p.volume,
@@ -71,7 +95,7 @@ export default function PersonDetail({ params }: { params: Promise<{ name: strin
   }));
 
   // 等级判断逻辑
-  const getLevel = (acc: number) => {
+  const getLevel = (acc: number): { label: string; color: LevelColor } => {
     if (acc >= 0.98) return { label: "Master", color: "indigo" };
     if (acc >= 0.95) return { label: "Expert", color: "emerald" };
     if (acc >= 0.90) return { label: "Senior", color: "amber" };
@@ -169,11 +193,11 @@ export default function PersonDetail({ params }: { params: Promise<{ name: strin
             </h3>
           </div>
           <div className="flex-1 overflow-auto divide-y divide-slate-50">
-            {data.projects.map((p: any, i: number) => (
+            {data.projects.map((p, i) => (
               <div key={i} className="px-8 py-5 hover:bg-slate-50/50 transition-colors group">
                 <div className="flex justify-between items-start mb-2">
                   <div className="font-bold text-slate-800">{p.project_name}</div>
-                  <div className={`text-sm font-black ${p.accuracy > 0.95 ? 'text-emerald-500' : 'text-amber-500'}`}>
+                  <div className={`text-sm font-black ${(p.accuracy ?? 0) > 0.95 ? 'text-emerald-500' : 'text-amber-500'}`}>
                     {p.accuracy ? (p.accuracy * 100).toFixed(1) + "%" : "-"}
                   </div>
                 </div>
@@ -191,12 +215,13 @@ export default function PersonDetail({ params }: { params: Promise<{ name: strin
   );
 }
 
-function StatsMini({ label, value, color }: any) {
-  const colors: any = {
+function StatsMini({ label, value, color }: StatsMiniProps) {
+  const colors: Record<LevelColor, string> = {
     indigo: "text-indigo-600",
     amber: "text-amber-600",
     emerald: "text-emerald-600",
     rose: "text-rose-600",
+    slate: "text-slate-600",
   };
   return (
     <div className="bg-slate-50/50 rounded-2xl p-4 border border-slate-100">

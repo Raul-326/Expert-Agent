@@ -10,6 +10,8 @@ export default function AdminWorkspace() {
   const [token, setToken] = useState("");
   const [projectName, setProjectName] = useState("");
   const [pocName, setPocName] = useState("");
+  const [sopUrl, setSopUrl] = useState("");
+  const [manualSopScore, setManualSopScore] = useState("");
   const [loading, setLoading] = useState(false);
   const [jobStatus, setJobStatus] = useState<JobStatus>("idle");
   const [statusMessage, setStatusMessage] = useState("");
@@ -34,6 +36,8 @@ export default function AdminWorkspace() {
           user_access_token: token,
           project_group_name: projectName || "Default Project",
           poc_name: pocName || undefined,
+          sop_url: sopUrl || undefined,
+          manual_sop_score: manualSopScore === "" ? undefined : Number(manualSopScore),
         }),
       });
 
@@ -46,7 +50,7 @@ export default function AdminWorkspace() {
         setJobStatus("error");
         setStatusMessage(`❌ 出错: ${data.detail || "请求失败，请检查后端日志"}`);
       }
-    } catch (error) {
+    } catch {
       setJobStatus("error");
       setStatusMessage("❌ 无法连接到后端 API。请确认 FastAPI 已在 Port 8000 运行。\n提示：在终端运行 bash deploy/start_dev.sh");
     } finally {
@@ -152,10 +156,36 @@ export default function AdminWorkspace() {
             </div>
           </div>
 
+          <div className="grid grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">SOP URL（可选）</label>
+              <input
+                type="text"
+                placeholder="https://bytedance.larkoffice.com/docx/... 或 wiki/..."
+                className="w-full border border-slate-300 rounded-lg p-3 outline-none focus:ring-2 focus:ring-indigo-500 transition-shadow"
+                value={sopUrl}
+                onChange={(e) => setSopUrl(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">手工 SOP 分（可选）</label>
+              <input
+                type="number"
+                min="0"
+                max="100"
+                step="0.1"
+                placeholder="不填则仅在提供 SOP URL 时自动评分"
+                className="w-full border border-slate-300 rounded-lg p-3 outline-none focus:ring-2 focus:ring-indigo-500 transition-shadow"
+                value={manualSopScore}
+                onChange={(e) => setManualSopScore(e.target.value)}
+              />
+            </div>
+          </div>
+
           <div className="pt-4 flex justify-end space-x-4">
             <button
               type="button"
-              onClick={() => { setUrl(""); setToken(""); setProjectName(""); setPocName(""); setJobStatus("idle"); }}
+              onClick={() => { setUrl(""); setToken(""); setProjectName(""); setPocName(""); setSopUrl(""); setManualSopScore(""); setJobStatus("idle"); }}
               className="px-6 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors"
             >
               清空

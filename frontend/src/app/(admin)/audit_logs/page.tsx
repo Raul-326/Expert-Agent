@@ -3,8 +3,20 @@
 import React, { useEffect, useState } from "react";
 import { API_BASE_URL } from "@/lib/constants";
 
+type AuditLogItem = {
+  id: number;
+  table_name: string;
+  record_id: number;
+  action: string;
+  operator: string;
+  old_value?: string | null;
+  new_value?: string | null;
+  reason?: string | null;
+  created_at: string;
+};
+
 export default function AuditLogsPage() {
-  const [logs, setLogs] = useState<any[]>([]);
+  const [logs, setLogs] = useState<AuditLogItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {

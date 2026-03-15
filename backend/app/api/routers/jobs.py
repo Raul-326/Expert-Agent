@@ -21,7 +21,9 @@ async def trigger_compute(request: JobComputeRequest, background_tasks: Backgrou
             user_access_token=request.user_access_token,
             sheet_name=request.sheet_name,
             project_group_name=request.project_group_name,
-            poc_name=request.poc_name
+            poc_name=request.poc_name,
+            sop_url=request.sop_url or "",
+            manual_sop_score=request.manual_sop_score,
         )
         print(f"Agent Pipeline Execution Finished: {result}")
 
@@ -31,5 +33,5 @@ async def trigger_compute(request: JobComputeRequest, background_tasks: Backgrou
     return {
         "status": "accepted",
         "message": "Multi-Agent pipeline has been triggered in background.",
-        "project": request.project_group_name
+        "project": request.project_group_name,
     }

@@ -7,16 +7,27 @@ import {
   Search,
   ArrowRight,
   Loader2,
-  UserCheck,
-  BarChart,
-  Trophy,
   Filter
 } from "lucide-react";
 import { API_BASE_URL } from "@/lib/constants";
 
+type PersonSummary = {
+  person_name: string;
+  roles: string;
+  project_count: number;
+  volume_total: number;
+  inspected_total: number;
+  pass_total: number;
+  accuracy: number;
+};
+
+type PersonCardProps = {
+  person: PersonSummary;
+};
+
 export default function PeoplePage() {
-  const [people, setPeople] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [people, setPeople] = useState<PersonSummary[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
 
   useEffect(() => {
@@ -31,7 +42,7 @@ export default function PeoplePage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const filteredPeople = people.filter(p => 
+  const filteredPeople = people.filter((p) => 
     p.person_name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -85,7 +96,7 @@ export default function PeoplePage() {
   );
 }
 
-function PersonCard({ person }: any) {
+function PersonCard({ person }: PersonCardProps) {
   const accuracy = person.accuracy || 0;
   
   return (

@@ -2,8 +2,6 @@
 
 import React, { useEffect, useState } from "react";
 import {
-  LineChart,
-  Line,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -24,8 +22,23 @@ import {
 } from "lucide-react";
 import { API_BASE_URL } from "@/lib/constants";
 
+type ProjectTrend = {
+  project_group_id: number;
+  project_name: string;
+  overall_accuracy: number;
+  total_volume: number;
+  date: string;
+};
+
+type TrendCardProps = {
+  title: string;
+  value: string;
+  icon: React.ReactNode;
+  desc: string;
+};
+
 export default function QualityTrends() {
-  const [projects, setProjects] = useState<any[]>([]);
+  const [projects, setProjects] = useState<ProjectTrend[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -34,7 +47,7 @@ export default function QualityTrends() {
       .then((data) => {
         if (data.data) {
           // 按日期排序以便展示趋势
-          const sorted = [...data.data].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+          const sorted = [...data.data].sort((a: ProjectTrend, b: ProjectTrend) => new Date(a.date).getTime() - new Date(b.date).getTime());
           setProjects(sorted);
         }
       })
@@ -51,14 +64,14 @@ export default function QualityTrends() {
   }
 
   // 准备图表数据
-  const chartData = projects.map((p: any) => ({
+  const chartData = projects.map((p) => ({
     name: p.project_name,
     accuracy: p.overall_accuracy * 100,
     volume: p.total_volume,
     shortName: p.project_name.length > 10 ? p.project_name.substring(0, 10) + "..." : p.project_name
   }));
 
-  const avgAcc = projects.length > 0 ? (projects.reduce((acc: any, p: any) => acc + p.overall_accuracy, 0) / projects.length) * 100 : 0;
+  const avgAcc = projects.length > 0 ? (projects.reduce((acc, p) => acc + p.overall_accuracy, 0) / projects.length) * 100 : 0;
 
   return (
     <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in duration-700">
@@ -77,7 +90,7 @@ export default function QualityTrends() {
         />
         <TrendStatCard 
           title="高质项目占比" 
-          value={((projects.filter((p: any) => p.overall_accuracy > 0.95).length / (projects.length || 1)) * 100).toFixed(0) + "%"} 
+          value={((projects.filter((p) => p.overall_accuracy > 0.95).length / (projects.length || 1)) * 100).toFixed(0) + "%"} 
           icon={<Target className="w-6 h-6 text-indigo-600" />} 
           desc="准确率 > 95% 的标评项目"
         />
@@ -180,7 +193,7 @@ export default function QualityTrends() {
   );
 }
 
-function TrendStatCard({ title, value, icon, desc }: any) {
+function TrendStatCard({ title, value, icon, desc }: TrendCardProps) {
   return (
     <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-slate-50 relative overflow-hidden group hover:shadow-lg transition-all">
       <div className="flex justify-between items-start mb-4">

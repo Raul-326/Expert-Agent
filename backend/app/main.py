@@ -29,7 +29,8 @@ def on_startup():
         os.environ["FEISHU_APP_ID"] = settings.FEISHU_APP_ID
     if settings.FEISHU_APP_SECRET:
         os.environ["FEISHU_APP_SECRET"] = settings.FEISHU_APP_SECRET
-    create_db_and_tables()
+    if settings.AUTO_CREATE_SCHEMA:
+        create_db_and_tables()
 
 @app.get("/health")
 def health_check():

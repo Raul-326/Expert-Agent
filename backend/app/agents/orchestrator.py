@@ -17,6 +17,8 @@ def ProcessWorkflow(
     sheet_name: str = None,
     project_group_name: str = "Default Project",
     poc_name: str = None,
+    sop_url: str = "",
+    manual_sop_score: float = None,
     difficulty_coef: float = 1.0
 ) -> dict:
     """
@@ -33,28 +35,46 @@ def ProcessWorkflow(
 
         # 1. 启动 DataFetcherAgent 拉取并清洗数据
         fetcher = DataFetcherAgent(feishu_url, user_access_token)
-        rows = fetcher.fetch(sheet_name)
+        fetch_result = fetcher.fetch(sheet_name)
+        rows = fetch_result["rows"]
 
         # 2. 启动 EvaluatorAgent 执行评价和大模型打分算分流程
         evaluator = EvaluatorAgent()
-        eval_result = evaluator.evaluate(rows)
+        eval_result = evaluator.evaluate(
+            rows,
+            token=token,
+            sop_url=sop_url,
+            manual_sop_score=manual_sop_score,
+            manual_project_owner=poc_name or "",
+        )
         stats = eval_result["stats"]
         schema_type = eval_result["schema_type"]
+        score_card = eval_result.get("poc_score")
+        project_owner = eval_result.get("project_owner") or poc_name
 
         # 3. 启动 DatabaseWriterAgent 持久化到新 ORM 数据库
         writer = DatabaseWriterAgent()
-        run_id = writer.write(
+        write_result = writer.write(
             project_group_name=project_group_name,
             spreadsheet_token=spreadsheet_token,
-            poc_name=poc_name,
+            poc_name=project_owner,
             stats=stats,
+            sheet_ref=fetch_result.get("sheet_ref") or "",
+            sheet_title=fetch_result.get("sheet_title") or "",
+            schema_type=schema_type,
+            poc_score=score_card,
             difficulty_coef=difficulty_coef
         )
 
         return {
             "status": "success",
-            "run_id": run_id,
-            "message": f"Workflow processed successfully, run_id={run_id}"
+            "run_id": write_result["run_id"],
+            "poc_score_id": write_result.get("poc_score_id"),
+            "schema_type": schema_type,
+            "project_owner": project_owner,
+            "score_card": score_card,
+            "warnings": eval_result.get("warnings", []),
+            "message": f"Workflow processed successfully, run_id={write_result['run_id']}"
         }
     except Exception as e:
         return {

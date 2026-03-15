@@ -7,3 +7,5 @@ class JobComputeRequest(BaseModel):
     sheet_name: Optional[str] = None
     project_group_name: Optional[str] = "Default Project"
     poc_name: Optional[str] = None
+    sop_url: Optional[str] = None
+    manual_sop_score: Optional[float] = None

@@ -9,20 +9,54 @@ import {
   BarChart,
   Loader2,
   ChevronRight,
-  TrendingUp,
-  LineChart
+  TrendingUp
 } from "lucide-react";
 import { API_BASE_URL } from "@/lib/constants";
 
+type ProjectPerson = {
+  person_name: string;
+  role: string;
+  volume_total: number;
+  inspected_total: number;
+  pass_total: number;
+  accuracy: number | null;
+};
+
+type PocScore = {
+  total_score: number;
+  grade: string;
+  sop_score: number;
+  sheet_score: number;
+  project_owner: string;
+};
+
+type ProjectDetailData = {
+  project_name: string;
+  poc_name: string | null;
+  created_at: string;
+  people: ProjectPerson[];
+  poc_score?: PocScore | null;
+};
+
+type DetailMetricProps = {
+  label: string;
+  value: string;
+  icon: React.ReactNode;
+};
+
 export default function ProjectDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const [detail, setDetail] = useState<any>(null);
+  const [detail, setDetail] = useState<ProjectDetailData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetch(`${API_BASE_URL}/api/v1/projects/${id}/detail`)
-      .then((res) => res.json())
-      .then((data) => {
+      .then(async (res) => {
+        if (!res.ok) {
+          setDetail(null);
+          return;
+        }
+        const data: ProjectDetailData = await res.json();
         setDetail(data);
       })
       .catch((err) => console.error(err))
@@ -37,7 +71,7 @@ export default function ProjectDetail({ params }: { params: Promise<{ id: string
     );
   }
 
-  if (!detail || detail.error) {
+  if (!detail) {
     return (
       <div className="p-8 text-center text-slate-500">
         <h2 className="text-xl font-bold">项目未找到</h2>
@@ -47,9 +81,10 @@ export default function ProjectDetail({ params }: { params: Promise<{ id: string
   }
 
   // 计算项目汇总
-  const totalVolume = detail.people.reduce((acc: any, p: any) => acc + p.volume_total, 0);
-  const avgAccuracy = detail.people.length > 0
-    ? detail.people.filter((p:any) => p.accuracy).reduce((acc: any, p: any) => acc + p.accuracy, 0) / detail.people.filter((p:any) => p.accuracy).length
+  const totalVolume = detail.people.reduce((acc, p) => acc + p.volume_total, 0);
+  const accuracyRows = detail.people.filter((p) => p.accuracy !== null);
+  const avgAccuracy = accuracyRows.length > 0
+    ? accuracyRows.reduce((acc, p) => acc + (p.accuracy ?? 0), 0) / accuracyRows.length
     : 0;
 
   return (
@@ -101,7 +136,7 @@ export default function ProjectDetail({ params }: { params: Promise<{ id: string
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50/50 text-sm">
-                {detail.people.map((p: any, idx: number) => (
+                {detail.people.map((p, idx) => (
                   <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
                     <td className="px-8 py-5">
                       <Link href={`/people/${encodeURIComponent(p.person_name)}`} className="font-bold text-slate-700 hover:text-indigo-600 transition-colors">
@@ -142,10 +177,12 @@ export default function ProjectDetail({ params }: { params: Promise<{ id: string
             </h3>
             <div className="space-y-4">
               {detail.people
-                .filter((p: any) => p.accuracy)
-                .sort((a: any, b: any) => b.accuracy - a.accuracy)
+                .filter((p) => p.accuracy !== null)
+                .sort((a, b) => (b.accuracy ?? 0) - (a.accuracy ?? 0))
                 .slice(0, 3)
-                .map((p: any, i: number) => (
+                .map((p, i) => {
+                  const accuracy = p.accuracy ?? 0;
+                  return (
                   <div key={i} className="bg-white/10 backdrop-blur-md rounded-2xl p-4 flex items-center justify-between border border-white/10">
                     <div className="flex items-center space-x-3">
                       <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center font-bold text-sm">
@@ -157,10 +194,10 @@ export default function ProjectDetail({ params }: { params: Promise<{ id: string
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="font-black text-xs">{(p.accuracy * 100).toFixed(1)}%</div>
+                      <div className="font-black text-xs">{(accuracy * 100).toFixed(1)}%</div>
                     </div>
                   </div>
-                ))}
+                )})}
             </div>
           </div>
 
@@ -171,7 +208,7 @@ export default function ProjectDetail({ params }: { params: Promise<{ id: string
             </h3>
             <div className="space-y-4">
                {/* 简化版进度条表示分布 */}
-               {detail.people.slice(0, 5).map((p: any, i: number) => (
+               {detail.people.slice(0, 5).map((p, i) => (
                  <div key={i}>
                     <div className="flex justify-between text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-tighter">
                       <span>{p.person_name}</span>
@@ -193,7 +230,7 @@ export default function ProjectDetail({ params }: { params: Promise<{ id: string
   );
 }
 
-function DetailMetric({ label, value, icon }: any) {
+function DetailMetric({ label, value, icon }: DetailMetricProps) {
   return (
     <div className="bg-white px-6 py-4 rounded-2xl border border-slate-100 shadow-sm flex items-center space-x-4">
       <div className="p-3 bg-slate-50 rounded-xl text-slate-400">

@@ -15,13 +15,22 @@ import {
 } from "lucide-react";
 import { API_BASE_URL } from "@/lib/constants";
 
+type ProjectSummary = {
+  project_group_id: number;
+  project_name: string;
+  poc_name: string;
+  person_count: number;
+  total_volume: number;
+  overall_accuracy: number;
+};
+
 export default function AdminProjectsPage() {
-  const [projects, setProjects] = useState<any[]>([]);
+  const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
 
-  const fetchProjects = () => {
-    setLoading(true);
+  const fetchProjects = (showSpinner = true) => {
+    if (showSpinner) setLoading(true);
     fetch(`${API_BASE_URL}/api/v1/projects/`)
       .then((res) => res.json())
       .then((data) => {
@@ -32,10 +41,16 @@ export default function AdminProjectsPage() {
   };
 
   useEffect(() => {
-    fetchProjects();
+    fetch(`${API_BASE_URL}/api/v1/projects/`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.data) setProjects(data.data);
+      })
+      .catch((err) => console.error(err))
+      .finally(() => setLoading(false));
   }, []);
 
-  const filteredProjects = projects.filter(p => 
+  const filteredProjects = projects.filter((p) => 
     p.project_name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -47,7 +62,7 @@ export default function AdminProjectsPage() {
           <p className="text-slate-500 mt-1">管理、核校、或删除已入库的项目资产记录</p>
         </div>
         <button 
-          onClick={fetchProjects}
+          onClick={() => fetchProjects()}
           className="flex items-center space-x-2 px-4 py-2 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors font-bold text-sm text-slate-600 shadow-sm"
         >
           <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />

@@ -9,13 +9,29 @@ import {
   TrendingUp,
   Search,
   ArrowRight,
-  ExternalLink,
   Loader2
 } from "lucide-react";
 import { API_BASE_URL } from "@/lib/constants";
 
+type ProjectSummary = {
+  project_group_id: number;
+  project_name: string;
+  poc_name: string;
+  person_count: number;
+  total_volume: number;
+  overall_accuracy: number;
+  date: string;
+};
+
+type MetricCardProps = {
+  title: string;
+  value: string | number;
+  icon: React.ReactNode;
+  color: 'indigo' | 'emerald' | 'amber' | 'rose';
+};
+
 export default function BossDashboard() {
-  const [projects, setProjects] = useState<any[]>([]);
+  const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
 
@@ -31,7 +47,7 @@ export default function BossDashboard() {
       .finally(() => setLoading(false));
   }, []);
 
-  const filteredProjects = projects.filter(p =>
+  const filteredProjects = projects.filter((p) =>
     p.project_name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -81,7 +97,6 @@ export default function BossDashboard() {
           value={(avgAccuracy * 100).toFixed(1) + "%"}
           icon={<BarChart3 className="w-6 h-6 text-amber-600" />}
           color="amber"
-          highlight={avgAccuracy > 0.95}
         />
         <MetricCard
           title="参与人员数"
@@ -182,8 +197,8 @@ export default function BossDashboard() {
   );
 }
 
-function MetricCard({ title, value, icon, color, highlight = false }: any) {
-  const colors: any = {
+function MetricCard({ title, value, icon, color }: MetricCardProps) {
+  const colors: Record<MetricCardProps['color'], string> = {
     indigo: "bg-indigo-50 border-indigo-100",
     emerald: "bg-emerald-50 border-emerald-100",
     amber: "bg-amber-50 border-amber-100",
