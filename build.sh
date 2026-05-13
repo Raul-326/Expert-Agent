@@ -9,20 +9,27 @@ rm -rf "$OUTPUT_DIR"
 mkdir -p "$OUTPUT_DIR"
 
 if ! command -v npm >/dev/null 2>&1; then
-  echo "[SCM] 未找到 npm。请在 SCM 中选择包含 Node.js/npm 的编译镜像。"
-  exit 1
+  echo "[SCM] 未找到 npm。将跳过前端构建，仅打包后端。如果您需要前端镜像，请更换 SCM 编译语言镜像。"
+  SKIP_FRONTEND=true
+else
+  SKIP_FRONTEND=false
 fi
 
-echo "[SCM] 构建前端..."
-cd "$ROOT_DIR/frontend"
-npm ci
-npm run build
+if [ "$SKIP_FRONTEND" = false ]; then
+  echo "[SCM] 构建前端..."
+  cd "$ROOT_DIR/frontend"
+  npm ci
+  npm run build
 
-echo "[SCM] 复制前端运行产物..."
-mkdir -p "$OUTPUT_DIR/frontend/.next"
-cp -R .next/standalone/. "$OUTPUT_DIR/frontend/"
-cp -R .next/static "$OUTPUT_DIR/frontend/.next/static"
-cp -R public "$OUTPUT_DIR/frontend/public"
+  echo "[SCM] 复制前端运行产物..."
+  mkdir -p "$OUTPUT_DIR/frontend/.next"
+  cp -R .next/standalone/. "$OUTPUT_DIR/frontend/"
+  cp -R .next/static "$OUTPUT_DIR/frontend/.next/static"
+  cp -R public "$OUTPUT_DIR/frontend/public"
+  cd "$ROOT_DIR"
+else
+  echo "[SCM] 跳过前端构建步骤。"
+fi
 
 echo "[SCM] 复制后端运行文件..."
 mkdir -p "$OUTPUT_DIR/backend"
